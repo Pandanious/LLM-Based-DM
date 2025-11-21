@@ -1,25 +1,24 @@
-from dataclasses import dataclass,field,asdict
-from typing import List,Optional,Dict
+from dataclasses import dataclass, field, asdict
 from datetime import datetime
+from typing import List, Dict, Optional
 
 
 @dataclass
 class World_State:
-    # description of the game world.
-
-    world_id : str          # some id 
-    title : str             # Name of setting
-    setting_prompt : str            # user def settings             
-    world_summary : str             # LLM gen setting
-    lore : str                      # LLM gen, details for DM
-    players : List[str]             
-    created_on : datetime           #creaton date for reuse.
-    last_played : Optional[datetime] = None
+    world_id: str
+    title: str
+    setting_prompt: str
+    world_summary: str
+    lore: str
+    players: List[str]
+    created_on: datetime
+    last_played: Optional[datetime] = None
     notes: List[str] = field(default_factory=list)
+    # List of skills that exist in this world (e.g. ["Hacking", "Firearms", ...])
+    skills: List[str] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         data = asdict(self)
-        # convert datetimes to iso strings
         if isinstance(self.created_on, datetime):
             data["created_on"] = self.created_on.isoformat()
         if isinstance(self.last_played, datetime):
@@ -52,7 +51,9 @@ class World_State:
             created_on=created_on,
             last_played=last_played,
             notes=list(data.get("notes", [])),
+            skills=list(data.get("skills", [])),
         )
+
 
 @dataclass
 class PlayerCharacter:
@@ -60,14 +61,15 @@ class PlayerCharacter:
     A single player character (PC) in the world.
     This is what we save to JSON and feed summaries to the LLM.
     """
-    pc_id: str                # unique id, e.g. "alice_pc_1"
-    player_name: str          # the human player at the table: "Alice"
-    name: str                 # the character's name in-game
-    concept: str              # short concept: "grizzled ex-soldier turned hunter"
+    pc_id: str                # unique id, e.g. "default_alice"
+    player_name: str          # real player name at the table
+    name: str                 # character's in-world name
+    gender: str               # "female", "male", "non-binary", etc.
     ancestry: str             # race/species/etc.
     archetype: str            # class/role: "hacker", "fighter", etc.
     level: int
-    stats: Dict[str, int]     # e.g. {"STR": 12, "DEX": 14, ...}
+    concept: str              # short concept/background
+    stats: Dict[str, int]     # {"STR": 12, "DEX": 14, ...}
     max_hp: int
     current_hp: int
     skills: List[str] = field(default_factory=list)
@@ -78,7 +80,6 @@ class PlayerCharacter:
 
     def to_dict(self) -> dict:
         data = asdict(self)
-        # datetime to ISO
         if isinstance(self.created_on, datetime):
             data["created_on"] = self.created_on.isoformat()
         if isinstance(self.last_updated, datetime):
@@ -105,10 +106,11 @@ class PlayerCharacter:
             pc_id=data["pc_id"],
             player_name=data["player_name"],
             name=data["name"],
-            concept=data["concept"],
+            gender=data.get("gender", ""),
             ancestry=data.get("ancestry", ""),
             archetype=data.get("archetype", ""),
             level=int(data.get("level", 1)),
+            concept=data.get("concept", ""),
             stats={k: int(v) for k, v in data.get("stats", {}).items()},
             max_hp=int(data.get("max_hp", 10)),
             current_hp=int(data.get("current_hp", 10)),

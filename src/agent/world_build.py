@@ -1,229 +1,49 @@
-# src/agent/world_build.py
-
+import re
 from datetime import datetime
 from textwrap import dedent
-from typing import List
+from typing import List, Tuple
 
 from src.llm_client import get_llm
-from src.game.models import World_State  # make sure this matches your dataclass name
+from src.game.models import World_State
 
-import re
-
-HEADER_LINES = [
-    r"^---\s*$",
-    r"^CAMPAIGN TITLE:.*",
-    r"^WORLD SUMMARY:.*",
-    r"^LORE:.*",
-    r"^TITLE:.*",
-]
-
-BOT_SNIPPETS = [
-    "I am a bot and this action was performed automatically",
-]
-
-
-def _clean_paragraph(text: str) -> str:
-    """Remove headers, bot footers, trivial junk from a block of text."""
-    lines = []
-    seen_lines = set()
-
-    for raw_line in text.splitlines():
-        line = raw_line.strip()
-        if not line:
-            continue
-
-        # drop header-ish lines
-        if any(re.match(pat, line, re.IGNORECASE) for pat in HEADER_LINES):
-            continue
-
-        # drop obvious bot footer lines
-        if any(snippet in line for snippet in BOT_SNIPPETS):
-            continue
-
-        # avoid exact duplicate lines
-        if line in seen_lines:
-            continue
-        seen_lines.add(line)
-
-        lines.append(line)
-
-    return "\n".join(lines).strip()
-
-
-def _sanitize_world_text(raw: str) -> str:
-    """
-    Clean raw LLM output:
-    - strip code tags / </code> etc.
-    - drop headers, footers, duplicates
-    - normalize paragraphs
-    """
-    text = raw.replace("<code>", "").replace("</code>", "")
-    text = text.strip()
-
-    paras = [p.strip() for p in text.split("\n\n") if p.strip()]
-
-    cleaned_paras = []
-    seen_paras = set()
-    for p in paras:
-        cleaned = _clean_paragraph(p)
-        if not cleaned:
-            continue
-        if cleaned in seen_paras:
-            continue
-        seen_paras.add(cleaned)
-        cleaned_paras.append(cleaned)
-
-    return "\n\n".join(cleaned_paras).strip()
-
-
-def _clean_title(title: str, world_summary: str, fallback_setting: str) -> str:
-    """
-    Clean obvious template/markdown junk from the title.
-    If it still looks wrong, try to infer a title from the summary.
-    """
-    t = title.strip()
-
-    # strip markdown headings and templates
-    t = re.sub(r"^#+\s*", "", t)  # remove leading #, ##, etc.
-    t = re.sub(r"^YOUR ANSWER\s*:?\s*", "", t, flags=re.IGNORECASE)
-    t = re.sub(r"^TITLE\s*:?\s*", "", t, flags=re.IGNORECASE)
-
-    # if it still looks like instructions, derive from summary
-    lower = t.lower()
-    if (not t) or "short, punchy" in lower or "your answer" in lower or t == "#Title":
-        # try pattern: "<Something> is ..." at start of summary
-        m = re.match(r'^"?([^".]+?)"?\s+is\b', world_summary)
-        if m:
-            t = m.group(1).strip()
-        else:
-            # fallback: first sentence of summary
-            m2 = re.match(r"^(.+?)\.", world_summary)
-            if m2:
-                t = m2.group(1).strip()
-
-    if not t:
-        t = "Untitled Campaign"
-
-    return t
-
-
-def _strip_section_headers(text: str) -> str:
-    """Remove 'Summary:', '#Lore', etc. from inside summary/lore."""
-    out_lines = []
-    for line in text.splitlines():
-        stripped = line.strip()
-        if re.match(r"^#+\s*(summary|lore|campaign title)[:\s]*$", stripped, flags=re.I):
-            continue
-        if re.match(r"^(summary|lore|title)[:\s]*$", stripped, flags=re.I):
-            continue
-        out_lines.append(line)
-    return "\n".join(out_lines).strip()
-
-def _infer_title_from_summary(world_summary: str, fallback_setting: str) -> str:
-    """
-    Derive a campaign title from the summary text.
-    Ignores junk like 'Sample answer', 'YOUR ANSWER', etc.
-    """
-    s = world_summary.strip()
-
-    # Strip obvious headers like 'Summary:', '# Title', etc.
-    s = re.sub(r"^#+\s*(summary|title)[:\s]*", "", s, flags=re.IGNORECASE).strip()
-    s = re.sub(r"^(summary|title)[:\s]*", "", s, flags=re.IGNORECASE).strip()
-
-    # If line still looks like template junk, ignore it
-    bad_phrases = ["sample answer", "your answer", "short, punchy", "write a title"]
-    if any(p in s.lower() for p in bad_phrases):
-        s = ""
-
-    # Pattern: "<Something> is ..." at the start of the summary
-    #   e.g. "The City of Broken Dreams is a cyberpunk world..."
-    m = re.match(r'^"?([^".]+?)"?\s+is\b', s)
-    if m:
-        title = m.group(1).strip()
-    else:
-        # Fallback: take the first sentence or up to ~60 chars
-        m2 = re.match(r"^(.+?)[\.\n]", s)
-        if m2:
-            title = m2.group(1).strip()
-        else:
-            title = s[:60].strip()
-
-    # If after all that it's still empty or generic, use the setting prompt as a base
-    if not title:
-        title = fallback_setting[:60].strip() or "Untitled Campaign"
-
-    return title
-
-def _parse_world_sections(text: str, fallback_setting: str) -> tuple[str, str, str]:
-    """
-    Very forgiving parsing:
-    - sanitize the text
-    - treat the first paragraph as summary
-    - treat remaining paragraphs as lore
-    - derive the title from the summary only
-    """
-    cleaned = _sanitize_world_text(text)
-
-    if not cleaned:
-        return "Untitled Campaign", fallback_setting, ""
-
-    paras = [p.strip() for p in cleaned.split("\n\n") if p.strip()]
-
-    if not paras:
-        return "Untitled Campaign", fallback_setting, cleaned
-
-    # First paragraph: world summary
-    world_summary = paras[0]
-    # Rest: lore
-    lore = "\n\n".join(paras[1:]) if len(paras) > 1 else ""
-
-    # Clean obvious section headers out of summary/lore
-    world_summary = _strip_section_headers(world_summary)
-    lore = _strip_section_headers(lore)
-
-    # Now derive a good title purely from the summary
-    title = _infer_title_from_summary(world_summary, fallback_setting)
-
-    return title, world_summary, lore
 
 WORLD_GEN_PROMPT_TEMPLATE = dedent("""
 You are a creative tabletop RPG worldbuilder.
 
-Using the user's idea, write the following:
+The user describes an idea for a campaign world. Based on this idea, write:
 
-1. A campaign title (one short line).
-2. A world summary (3–6 sentences).
-3. Lore (3–5 paragraphs of rich detail: regions, factions, conflicts, mysteries, tone).
+1. A world summary (3–6 sentences).
+2. Lore (2–5 short paragraphs).
+3. A list of important character skills used in this world.
 
-Do NOT explain what you're doing.  
-Do NOT repeat these instructions.
-Do NOT reveal infomration hidden to the players.  
-Just write the title, summary, and lore as normal prose.
-You must answer only the latest message from the player.
-You must provide **one single answer and then stop**.
+Write normal prose. At the END of your reply, add a SKILLS section like:
 
-USER IDEA:
+SKILLS:
+- Skill name 1
+- Skill name 2
+- Skill name 3
+
+Do not write code. Do not repeat these instructions.
+
+WORLD IDEA:
 {setting}
-                                   
 """)
 
 
 def generate_world_state(setting_prompt: str, players: List[str], world_id: str = "default") -> World_State:
     """
-    Ask the LLM to invent a world for the given setting + players.
+    Ask the LLM to invent a world (summary, lore, skills) for the given setting + players.
     Returns a World_State object.
     """
     llm = get_llm()
 
-    player_list = players or ["Player"]
-    #players_str = ", ".join(player_list) if player_list else "Unnamed adventurers"
-
     prompt = WORLD_GEN_PROMPT_TEMPLATE.format(
-        setting=setting_prompt)
+        setting=setting_prompt,
+    )
 
     result = llm(
         prompt,
-        max_tokens=1200,       # plenty of room for multi-paragraph lore
+        max_tokens=900,
         temperature=0.8,
         top_p=0.9,
         top_k=40,
@@ -232,7 +52,9 @@ def generate_world_state(setting_prompt: str, players: List[str], world_id: str 
 
     raw_text = result["choices"][0]["text"].strip()
 
-    title, world_summary, lore = _parse_world_sections(raw_text, fallback_setting=setting_prompt)
+    title, world_summary, lore, skills = _parse_world_output(
+        raw_text, fallback_setting=setting_prompt
+    )
 
     now = datetime.utcnow()
 
@@ -242,10 +64,129 @@ def generate_world_state(setting_prompt: str, players: List[str], world_id: str 
         setting_prompt=setting_prompt,
         world_summary=world_summary,
         lore=lore,
-        players=player_list,
-        created_on=now,      # make sure these match your dataclass fields
+        players=players,
+        created_on=now,
         last_played=now,
         notes=[],
+        skills=skills,
     )
 
     return world
+
+
+def _sanitize_world_text(text: str) -> str:
+    """
+    Light cleanup: remove obvious code tags and trim.
+    """
+    cleaned = text.replace("<code>", "").replace("</code>", "")
+    cleaned = cleaned.strip()
+    return cleaned
+
+
+def _parse_skills_section(skills_text: str) -> List[str]:
+    """
+    Extract skills from a 'SKILLS:' section with lines like '- Skill'.
+    """
+    skills: List[str] = []
+    lines = skills_text.splitlines()
+
+    for line in lines:
+        stripped = line.strip()
+        if not stripped:
+            continue
+
+        # Stop if some new big header starts (rare here)
+        if re.match(r"^[A-Z ]+:$", stripped):
+            break
+
+        if stripped.startswith("-"):
+            skill = stripped.lstrip("-").strip()
+            if skill:
+                skills.append(skill)
+        else:
+            # Also allow plain lines as skill names
+            skills.append(stripped)
+
+    # de-duplicate while preserving order
+    seen = set()
+    deduped: List[str] = []
+    for s in skills:
+        if s.lower() in seen:
+            continue
+        seen.add(s.lower())
+        deduped.append(s)
+    return deduped
+
+
+def _infer_title_from_summary(world_summary: str, fallback_setting: str) -> str:
+    """
+    Derive a campaign title from the summary text.
+    Gemma sometimes echoes templates; we ignore obvious junk.
+    """
+    s = world_summary.strip()
+
+    # Strip simple headers
+    s = re.sub(r"^#+\s*(summary|title)[:\s]*", "", s, flags=re.IGNORECASE).strip()
+    s = re.sub(r"^(summary|title)[:\s]*", "", s, flags=re.IGNORECASE).strip()
+
+    bad_bits = ["sample answer", "your answer", "short, punchy", "write a title"]
+    if any(b in s.lower() for b in bad_bits):
+        s = ""
+
+    # Pattern: "<Something> is ..." at the start of the summary
+    m = re.match(r'^"?([^".]+?)"?\s+is\b', s)
+    if m:
+        title = m.group(1).strip()
+    else:
+        # Fallback: first sentence or first ~60 chars
+        m2 = re.match(r"^(.+?)[\.\n]", s)
+        if m2:
+            title = m2.group(1).strip()
+        else:
+            title = s[:60].strip()
+
+    if not title:
+        # fallback to setting prompt truncated
+        fallback = fallback_setting.strip()
+        if not fallback:
+            return "Untitled Campaign"
+        # maybe pattern "<Something> is" in setting
+        m3 = re.match(r'^"?([^".]+?)"?\s+is\b', fallback)
+        if m3:
+            return m3.group(1).strip()
+        return fallback[:60].strip()
+
+    return title
+
+
+def _parse_world_output(text: str, fallback_setting: str) -> Tuple[str, str, str, List[str]]:
+    """
+    Parse model output into (title, world_summary, lore, skills).
+    Simple, forgiving:
+    - Split off SKILLS: section
+    - First paragraph = world summary
+    - Remaining paragraphs = lore
+    - Title inferred from summary
+    """
+    cleaned = _sanitize_world_text(text)
+    if not cleaned:
+        return "Untitled Campaign", fallback_setting, "", []
+
+    # Split off SKILLS section if present
+    parts = re.split(r"\bSKILLS\s*:\s*", cleaned, maxsplit=1, flags=re.IGNORECASE)
+    main_text = parts[0].strip()
+    skills_text = parts[1].strip() if len(parts) > 1 else ""
+
+    skills = _parse_skills_section(skills_text) if skills_text else []
+
+    paragraphs = [p.strip() for p in main_text.split("\n\n") if p.strip()]
+
+    if not paragraphs:
+        return "Untitled Campaign", fallback_setting, main_text, skills
+
+    world_summary = paragraphs[0]
+    lore = "\n\n".join(paragraphs[1:]) if len(paragraphs) > 1 else ""
+
+    title = _infer_title_from_summary(world_summary, fallback_setting)
+
+    return title, world_summary, lore, skills
