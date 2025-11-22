@@ -14,8 +14,16 @@ class World_State:
     created_on: datetime
     last_played: Optional[datetime] = None
     notes: List[str] = field(default_factory=list)
-    # List of skills that exist in this world (e.g. ["Hacking", "Firearms", ...])
-    skills: List[str] = field(default_factory=list)
+
+    # NEW: structured world content
+    skills: List[str] = field(default_factory=list)  # world-wide skill list
+
+    # list of {"name": str, "description": str}
+    major_locations: List[Dict[str, str]] = field(default_factory=list)
+    minor_locations: List[Dict[str, str]] = field(default_factory=list)
+
+    # list of theme/tone bullet strings
+    themes: List[str] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         data = asdict(self)
@@ -51,10 +59,11 @@ class World_State:
             created_on=created_on,
             last_played=last_played,
             notes=list(data.get("notes", [])),
-            skills=list(data.get("skills", [])),
+            skills=list(data.get("skills", [])),  # safe for old saves
+            major_locations=list(data.get("major_locations", [])),
+            minor_locations=list(data.get("minor_locations", [])),
+            themes=list(data.get("themes", [])),
         )
-
-
 @dataclass
 class PlayerCharacter:
     """

@@ -1,5 +1,22 @@
+import os
 from functools import lru_cache
 from typing import Dict, List
+
+# Ensure CUDA/ggml DLLs are discoverable when llama_cpp loads.
+_dll_dirs = (
+    r"H:\CUDA\bin",
+    r"H:\Python\Agentic-Tutorial\.venv\lib\site-packages\llama_cpp\lib",
+)
+for _dll_dir in _dll_dirs:
+    if os.path.isdir(_dll_dir):
+        try:
+            os.add_dll_directory(_dll_dir)  # preferred on Windows 3.8+
+        except (AttributeError, FileNotFoundError):
+            pass
+        # Also extend PATH as a fallback for loaders that ignore add_dll_directory.
+        if _dll_dir not in os.environ.get("PATH", ""):
+            os.environ["PATH"] = f"{_dll_dir};{os.environ.get('PATH', '')}"
+
 from llama_cpp import Llama
 from src.agent.types import Message
 
@@ -71,6 +88,4 @@ def reset_model():
     get_llm.cache_clear()
     
  
-
-
 
