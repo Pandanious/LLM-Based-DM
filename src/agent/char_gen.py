@@ -83,11 +83,9 @@ def generate_character_sheet(
     gender: str,
     ancestry: str,
 ) -> PlayerCharacter:
-    """
-    Use the LLM to generate a medium-detailed character sheet,
-    keeping name, gender, and ancestry fixed, and picking skills
-    from the world's skill list.
-    """
+    
+    # Use the LLM to generate a medium-detailed character sheet, keeping name, gender, and ancestry fixed, and picking skills from the world's skill list.
+    
     llm = get_llm()
 
     skills_str = ", ".join(world_skills) if world_skills else "no specific skills listed"
@@ -157,10 +155,9 @@ def _parse_list_block(block: str) -> List[str]:
 
 
 def _dedupe_sentences(text: str, max_sentences: int = 4) -> str:
-    """
-    Split on sentence boundaries, remove exact or near-exact duplicates,
-    and keep at most max_sentences.
-    """
+    
+    # Split on sentence boundaries, remove exact or near-exact duplicates, and keep at most max_sentences.
+    
     # crude sentence split on . ! ?
     parts = re.split(r"([\.!?])", text)
     sentences = []
@@ -200,11 +197,9 @@ def _parse_character_text(
     fixed_gender: str,
     fixed_ancestry: str,
 ) -> PlayerCharacter:
-    """
-    Parse the LLM's character text into a PlayerCharacter.
-    Keeps name, gender, ancestry fixed to user choices.
-    Also de-duplicates repeated concept sentences.
-    """
+    
+    # Parse the LLM's character text into a PlayerCharacter. Keeps name, gender, ancestry fixed to user choices. Also de-duplicates repeated concept sentences.
+    
     text = raw_text.strip()
 
     # Archetype and level

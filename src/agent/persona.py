@@ -11,7 +11,7 @@ DM_SYSTEM_PROMPT_TEMPLATE = dedent("""
     - Keep pacing snappy.
     - If players ask about real-world facts, briefly answer or say you are unsure, then steer back to the game.
     - Stay focused on the game world.
-    - You provide atleast 3 options for the player to do. 
+    - You provide atleast 3 options for the player to do each in a new line. 
 
     ## Conversation Rules
     - You must answer only the latest message from the players.
