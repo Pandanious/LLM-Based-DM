@@ -40,6 +40,7 @@ Important style rules:
 - Do NOT add extra sections or commentary.
 - Do NOT use backticks or code fences.
 - Do Not Repeat yourself, once you have comepleted your task.
+- Always end your output with the line: `END: <<CHARACTER_SHEET_COMPLETE>>`                                  
 
 Write your answer in this format exactly (no extra commentary):
 
@@ -66,11 +67,16 @@ SKILLS:
 - <skill 1>
 - <skill 2>
 - <skill 3>
-
+- <skill 4>                                  
+- <skill 5>
+                                  
 INVENTORY:
 - <item 1>
 - <item 2>
 - <item 3>
+                                  
+END: <<CHARACTER_SHEET_COMPLETE>>
+                                                                    
 """)
 
 
@@ -112,6 +118,8 @@ def generate_character_sheet(
     )
 
     raw = result["choices"][0]["text"].strip()
+    raw = raw.replace("END: <<CHARACTER_SHEET_COMPLETE>>", "").strip()
+    raw = raw.replace("END:", "").strip()
 
     return _parse_character_text(
         raw_text=raw,
