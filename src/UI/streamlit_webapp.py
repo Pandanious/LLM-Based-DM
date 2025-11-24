@@ -52,7 +52,7 @@ with st.sidebar:
 
     players_raw = st.text_input(
         "Player names (comma-separated, local to you)",
-        value="Alice, Bob",
+        value="Alice",
         help="Names of the human players at the table. Each browser can set its own list for the speaker dropdown.",
     )
 
@@ -83,11 +83,19 @@ if startbutton:
     game.player_characters.clear()
     if hasattr(game, "npcs"):
         game.npcs.clear()
+if game.world is not None:
+    # sync PCs from saves/<world_id>_players.json
+    game.player_characters = load_player_characters(game.world.world_id)
+
 
 # ---------- Determine current state (BEFORE layout) ----------
 
 world_exists = game.world is not None
 pcs_exist = bool(game.player_characters)
+
+if world_exists and not pcs_exist:
+    game.player_characters = load_player_characters(game.world.world_id)
+    pcs_exist = bool(game.player_characters)
 
 # Decide chat prompt based on state
 if not world_exists:
@@ -97,7 +105,36 @@ elif world_exists and not pcs_exist:
 else:
     chat_prompt = "Play as your character(s). What do you do?"
 
+
+# ENSURE PARTY SUMMARY EXISTS *BEFORE* FIRST USER INPUT
+
+if game.world is not None:
+    # Always reload PCs from disk (important for cross-page sync)
+    loaded_pcs = load_player_characters(game.world.world_id)
+    if loaded_pcs:
+        game.player_characters = loaded_pcs
+
+# After reloading, check again
+pcs_exist = bool(game.player_characters)
+
+if game.world is not None and pcs_exist:
+    has_party_summary = any(
+        m.role == "system" and "PARTY SUMMARY" in m.content
+        for m in game.messages
+    )
+    if not has_party_summary:
+        summary_text = build_party_summary(game.player_characters)
+        if summary_text:
+            game.messages.append(
+                Message(
+                    role="system",
+                    content=summary_text,
+                    speaker=None,
+                )
+            )
+
 # Single global chat input (must be outside columns)
+
 user_input = st.chat_input(chat_prompt)
 
 # ---------- Handle input / world creation / DM interaction ----------
@@ -148,9 +185,7 @@ if user_input:
             intro = (
                 f"Very well. We will play in the world of **{world.title}**.\n\n"
                 f"{world.world_summary}\n\n"
-                "You stand at the beginning of a new adventure. "
-                "Tell me who you are and what you are doing as the story opens."
-            )
+                "You stand at the beginning of a new adventure. ")
 
             game.messages.append(
                 Message(
@@ -188,6 +223,10 @@ if user_input:
 world_exists = game.world is not None
 pcs_exist = bool(game.player_characters)
 # If we have PCs and no party summary yet, add one as a system message
+if world_exists and not pcs_exist:
+    game.player_characters = load_player_characters(game.world.world_id)
+    pcs_exist = bool(game.player_characters)
+    
 if world_exists and pcs_exist:
     has_party_summary = any(
         m.role == "system" and "PARTY SUMMARY" in m.content
@@ -207,9 +246,7 @@ if world_exists and pcs_exist:
 
 left_col, right_col = st.columns([3, 1])
 
-# =========================
 # RIGHT COLUMN: TABLE INFO
-# =========================
 
 with right_col:
     st.subheader("Table Info")
@@ -272,9 +309,8 @@ with right_col:
             for npc in sample_npcs:
                 st.markdown(f"- **{npc.name}** ({npc.role}) in *{npc.location}*")
 
-# =========================
+
 # LEFT COLUMN: GAME LOG
-# =========================
 
 with left_col:
     st.subheader("Game Log")
