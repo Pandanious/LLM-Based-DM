@@ -39,7 +39,8 @@ Important style rules:
 - Keep each section short and focused.
 - Do NOT add extra sections or commentary.
 - Do NOT use backticks or code fences.
-- Do Not Repeat yourself, once you have comepleted your task.
+- Do Not Repeat yourself, once you have completed your task.
+- Generate exactly ONE character sheet in the specified format and then stop. Do NOT start a second sheet.
 
 Write your answer in this format exactly (no extra commentary):
 
@@ -84,9 +85,10 @@ def generate_character_sheet(
     gender: str,
     ancestry: str,
 ) -> PlayerCharacter:
-    
-    # Use the LLM to generate a medium-detailed character sheet, keeping name, gender, and ancestry fixed, and picking skills from the world's skill list.
-    
+    """
+    Use the LLM to generate a medium-detailed character sheet, keeping name, gender,
+    and ancestry fixed, and picking skills from the world's skill list.
+    """
     llm = get_llm()
 
     skills_str = ", ".join(world_skills) if world_skills else "no specific skills listed"
@@ -101,14 +103,13 @@ def generate_character_sheet(
         world_skills=skills_str,
     )
 
-    # For LLaMA-3.1 8B: shorter max_tokens reduces rambly repetition
     result = llm(
         prompt,
         max_tokens=400,
         temperature=0.65,   # a bit lower for more discipline
         top_p=0.9,
         top_k=40,
-        repeat_penalty=1.15,
+        repeat_penalty=1.2,  # slightly stronger to reduce rambling
     )
 
     raw = result["choices"][0]["text"].strip()
@@ -156,9 +157,10 @@ def _parse_list_block(block: str) -> List[str]:
 
 
 def _dedupe_sentences(text: str, max_sentences: int = 4) -> str:
-    
-    # Split on sentence boundaries, remove exact or near-exact duplicates, and keep at most max_sentences.
-    
+    """
+    Split on sentence boundaries, remove exact or near-exact duplicates,
+    and keep at most max_sentences.
+    """
     # crude sentence split on . ! ?
     parts = re.split(r"([\.!?])", text)
     sentences = []
@@ -198,17 +200,15 @@ def _parse_character_text(
     fixed_gender: str,
     fixed_ancestry: str,
 ) -> PlayerCharacter:
-    
-    # Parse the LLM's character text into a PlayerCharacter. Keeps name, gender, ancestry fixed to user choices. Also de-duplicates repeated concept sentences.
-    
+    """
+    Parse the LLM's character text into a PlayerCharacter. Keeps name, gender,
+    ancestry fixed to user choices. Also de-duplicates repeated concept sentences.
+    """
     text = raw_text.strip()
 
     # Archetype and level
     archetype_match = re.search(
         r"^ARCHETYPE:\s*(.+)$", text, re.MULTILINE | re.IGNORECASE
-    )
-    level_match = re.search(
-        r"^LEVEL:\s*(\d+)", text, re.MULTILINE | re.IGNORECASE
     )
 
     archetype = archetype_match.group(1).strip() if archetype_match else ""

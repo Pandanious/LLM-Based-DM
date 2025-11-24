@@ -1,5 +1,3 @@
-# src/UI/streamlit_webapp.py
-
 import sys
 from pathlib import Path
 
@@ -10,9 +8,10 @@ if str(ROOT) not in sys.path:
 import streamlit as st
 import streamlit.components.v1 as components
 
+# imports from other .py files
 from src.agent.persona import DM_SYSTEM_PROMPT_TEMPLATE
 from src.agent.types import Message
-from src.llm_client import chat_completion
+from src.llm_client import chat_completion  # still imported, in case you need it elsewhere
 from src.agent.world_build import generate_world_state
 from src.game.save_state import save_world_state
 from src.game.game_state import get_global_games, GameState
@@ -20,6 +19,7 @@ from src.game.player_store import load_player_characters
 from src.agent.npc_gen import generate_npcs_for_world
 from src.game.npc_store import save_npcs
 from src.agent.party_summary import build_party_summary
+from src.agent.dm_dice import dm_turn_with_dice
 
 st.set_page_config(page_title="Local RPG Dungeon Master", layout="wide")
 st.title("Local Dungeon Master")
@@ -84,10 +84,31 @@ if startbutton:
     if hasattr(game, "npcs"):
         game.npcs.clear()
 
-# ---------- Determine current state (BEFORE layout) ----------
+# Always reload PCs from disk if a world already exists (sync with Character Manager)
+if game.world is not None:
+    game.player_characters = load_player_characters(game.world.world_id)
+
+# ---------- Determine current state (BEFORE layout & input) ----------
 
 world_exists = game.world is not None
 pcs_exist = bool(game.player_characters)
+
+# Ensure PARTY SUMMARY exists *before* any new user input
+if world_exists and pcs_exist:
+    has_party_summary = any(
+        m.role == "system" and "PARTY SUMMARY" in m.content
+        for m in game.messages
+    )
+    if not has_party_summary:
+        summary_text = build_party_summary(game.player_characters)
+        if summary_text:
+            game.messages.append(
+                Message(
+                    role="system",
+                    content=summary_text,
+                    speaker=None,
+                )
+            )
 
 # Decide chat prompt based on state
 if not world_exists:
@@ -160,7 +181,7 @@ if user_input:
                 )
             )
 
-    # CASE 2: world exists and PCs exist -> normal DM interaction
+    # CASE 2: world exists and PCs exist -> normal DM interaction (with dice handler)
     elif world_exists and pcs_exist:
         # We decide who is speaking later inside the left column (UI selectbox),
         # but we need a default speaker now in case current_speaker isn't set yet.
@@ -170,15 +191,8 @@ if user_input:
         game.messages.append(user_msg)
 
         with st.spinner("The DM is thinking...."):
-            reply = chat_completion(
-                game.messages,
-                temperature=0.6,
-            )
-
-        dm_msg = Message(
-            role="assistant", content=reply, speaker="Dungeon Master"
-        )
-        game.messages.append(dm_msg)
+            # Let the DM respond (and optionally request/resolve dice) in one logical turn
+            game.messages = dm_turn_with_dice(game.messages)
 
     # CASE 3: world exists but no PCs yet -> ignore input (we already tell the user via prompt)
     else:
@@ -187,22 +201,7 @@ if user_input:
 # After handling input, recompute state (world may now exist)
 world_exists = game.world is not None
 pcs_exist = bool(game.player_characters)
-# If we have PCs and no party summary yet, add one as a system message
-if world_exists and pcs_exist:
-    has_party_summary = any(
-        m.role == "system" and "PARTY SUMMARY" in m.content
-        for m in game.messages
-    )
-    if not has_party_summary:
-        summary_text = build_party_summary(game.player_characters)
-        if summary_text:
-            game.messages.append(
-                Message(
-                    role="system",
-                    content=summary_text,
-                    speaker=None,
-                )
-            )
+
 # ---------- Layout columns ----------
 
 left_col, right_col = st.columns([3, 1])
@@ -326,5 +325,3 @@ with left_col:
     else:
         current_speaker = None
         st.info("No local players defined, use the sidebar to add them.")
-
-    

@@ -1,6 +1,6 @@
 import os
 from functools import lru_cache
-from typing import Dict, List
+from typing import List
 
 # Ensure CUDA/ggml DLLs are discoverable when llama_cpp loads.
 _dll_dirs = (
@@ -30,7 +30,6 @@ from src.config import (
 )
 
 
-
 @lru_cache(maxsize=1)
 def get_llm() -> Llama:
     """Load and cache the Llama model."""
@@ -39,10 +38,8 @@ def get_llm() -> Llama:
         n_ctx=max_CTX,
         n_threads=cpu_threads,
         n_gpu_layers=gpu_layers,
-        verbose=True,
+        verbose=True,  # set to True for terminal logs, False if too noisy
     )
-
-
 
 
 def format_prompt(messages: List[Message]) -> str:
@@ -65,7 +62,8 @@ def format_prompt(messages: List[Message]) -> str:
 def chat_completion(
     messages: List[Message],
     temperature: float = default_temp,
-    max_tokens: int = default_max_tokens):
+    max_tokens: int = default_max_tokens,
+) -> str:
 
     llm = get_llm()
     prompt = format_prompt(messages)
@@ -76,18 +74,17 @@ def chat_completion(
         top_p=0.9,
         top_k=40,
         repeat_penalty=1.1,
-        #stop=["[PLAYER", "[ASSISTANT", "[DM]", "</s>"]
-        )
+        # Stop the model as soon as it tries to start a new turn or switch speaker
+        stop=["[PLAYER", "[ASSISTANT", "[SYSTEM", "</s>"],
+    )
 
     choices = result.get("choices", [])
     if not choices:
-# do something other than crashing
-        return '[DM is silent – no output from model]'    
-    reply = result["choices"][0].get("text","")
+        # do something other than crashing
+        return "[DM is silent – no output from model]"
+    reply = result["choices"][0].get("text", "")
     return reply.strip()
+
 
 def reset_model():
     get_llm.cache_clear()
-    
- 
-
