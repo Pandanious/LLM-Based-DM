@@ -76,7 +76,9 @@ def chat_completion(
         top_p=0.9,
         top_k=40,
         repeat_penalty=1.1,
-        stop=["[PLAYER", "[ASSISTANT", "[DM]", "</s>"])
+        #stop=["[PLAYER", "[ASSISTANT", "[DM]", "</s>"]
+        )
+
     choices = result.get("choices", [])
     if not choices:
 # do something other than crashing

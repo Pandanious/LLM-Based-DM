@@ -2,7 +2,7 @@ import streamlit as st
 from urllib.parse import urlparse, parse_qs
 
 from src.game.game_state import get_global_games
-
+from src.game.npc_store import load_npcs
 
 def get_world_from_query():
     """Extract ?game_id=XYZ and fetch world data."""
@@ -14,15 +14,15 @@ def get_world_from_query():
 
     if not game:
         st.error(f"No active game for game_id '{game_id}'")
-        return None, game_id
+        return None, None, game_id
 
-    return game.world, game_id
+    return game, game.world, game_id
 
 
 st.set_page_config(page_title="World Information", layout="wide")
 st.title("World Information")
 
-world, game_id = get_world_from_query()
+game, world, game_id = get_world_from_query()
 
 st.markdown(f"**Game ID:** `{game_id}`")
 
@@ -52,3 +52,30 @@ for loc in world.minor_locations:
 st.markdown("---")
 st.subheader("World Lore")
 st.write(world.lore)
+
+
+### NPC ADDITION
+
+st.markdown("---")
+st.subheader("NPCs in this World")
+
+# Ensure we have NPCs loaded (from shared memory or disk)
+if not game.npcs:
+    game.npcs = load_npcs(world.world_id)
+
+if not game.npcs:
+    st.info("No NPCs have been generated yet for this world.")
+else:
+    for npc_id, npc in game.npcs.items():
+        with st.expander(f"{npc.name} ({npc.role}) — {npc.location}"):
+            st.markdown(f"**Attitude:** {npc.attitude}")
+            if npc.tags:
+                st.markdown("**Tags:** " + ", ".join(npc.tags))
+
+            st.markdown("**Description:**")
+            st.write(npc.desc)
+
+            if npc.hooks:
+                st.markdown("**Hooks:**")
+                for h in npc.hooks:
+                    st.markdown(f"- {h}")

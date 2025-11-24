@@ -2,19 +2,17 @@ from dataclasses import dataclass, field
 from functools import lru_cache
 from typing import Dict, List, Optional
 
-from src.game.models import World_State, PlayerCharacter
+from src.game.models import World_State, PlayerCharacter, NPC
 from src.agent.types import Message
 
 @dataclass
 class GameState:
-    # Shared game state for a single campaign (one Game ID). 
-    # All users who join with the same game_id see this same object.
-    
     world: Optional[World_State] = None
     messages: List[Message] = field(default_factory=list)
     player_characters: Dict[str, PlayerCharacter] = field(default_factory=dict)
+    npcs: Dict[str, NPC] = field(default_factory=dict)
 
-
+    
 @lru_cache(maxsize=1)
 def get_global_games() -> Dict[str, GameState]:
     

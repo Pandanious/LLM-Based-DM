@@ -10,52 +10,19 @@ if str(ROOT) not in sys.path:
 import streamlit as st
 import streamlit.components.v1 as components
 
-from src.agent.char_gen import generate_character_sheet
-from src.game.player_store import load_player_characters, save_player_characters
 from src.agent.persona import DM_SYSTEM_PROMPT_TEMPLATE
 from src.agent.types import Message
 from src.llm_client import chat_completion
 from src.agent.world_build import generate_world_state
 from src.game.save_state import save_world_state
 from src.game.game_state import get_global_games, GameState
-
+from src.game.player_store import load_player_characters
+from src.agent.npc_gen import generate_npcs_for_world
+from src.game.npc_store import save_npcs
+from src.agent.party_summary import build_party_summary
 
 st.set_page_config(page_title="Local RPG Dungeon Master", layout="wide")
 st.title("Local Dungeon Master")
-
-
-# ---------- Shared UI helper ----------
-
-def render_character_card(pc) -> None:
-    """Show a character sheet in a collapsible card."""
-    with st.expander(f"{pc.name} ({pc.player_name}) – Level {pc.level}"):
-        st.markdown(f"**Concept:** {pc.concept}")
-        st.markdown(f"**Gender:** {pc.gender}")
-        st.markdown(f"**Ancestry:** {pc.ancestry}")
-        st.markdown(f"**Archetype:** {pc.archetype}")
-        st.markdown(f"**HP:** {pc.current_hp} / {pc.max_hp}")
-
-        st.markdown("**Stats**")
-        cols = st.columns(6)
-        for i, key in enumerate(["STR", "DEX", "CON", "INT", "WIS", "CHA"]):
-            with cols[i]:
-                st.metric(key, pc.stats.get(key, 10))
-
-        if pc.skills:
-            st.markdown("**Skills:**")
-            for s in pc.skills:
-                st.markdown(f"- {s}")
-
-        if pc.inventory:
-            st.markdown("**Inventory:**")
-            for item in pc.inventory:
-                st.markdown(f"- {item}")
-
-        if pc.notes:
-            st.markdown("**Notes:**")
-            for note in pc.notes:
-                st.markdown(f"- {note}")
-
 
 # ---------- Session-local UI state ----------
 
@@ -64,7 +31,6 @@ if "player_names" not in st.session_state:
 
 if "game_id" not in st.session_state:
     st.session_state.game_id = "default"  # default table name
-
 
 # ---------- Sidebar: Game ID + players + controls ----------
 
@@ -84,13 +50,6 @@ with st.sidebar:
 
     st.markdown("---")
 
-# not needed anymore!
-#    setting = st.text_area(
-#        "Default setting idea (optional)",
-#        value="A classic high-fantasy world filled with magic, dungeons, and dragons.",
-#        height=100,
-#    )
-
     players_raw = st.text_input(
         "Player names (comma-separated, local to you)",
         value="Alice, Bob",
@@ -104,12 +63,10 @@ with st.sidebar:
         reset_model()
         st.success("Model reloaded with fresh settings!")
 
-
 # Parse player names (per browser)
 player_names = [p.strip() for p in players_raw.split(",") if p.strip()]
 if player_names:
     st.session_state.player_names = player_names
-
 
 # ---------- Get shared GameState for this Game ID ----------
 
@@ -124,12 +81,196 @@ if startbutton:
     game.world = None
     game.messages.clear()
     game.player_characters.clear()
+    if hasattr(game, "npcs"):
+        game.npcs.clear()
 
+# ---------- Determine current state (BEFORE layout) ----------
 
-# ---------- Layout ----------
+world_exists = game.world is not None
+pcs_exist = bool(game.player_characters)
+
+# Decide chat prompt based on state
+if not world_exists:
+    chat_prompt = "Describe the world to begin. This will be used to forge the campaign setting."
+elif world_exists and not pcs_exist:
+    chat_prompt = "World created. Create characters in the Character Manager, then return here to play."
+else:
+    chat_prompt = "Play as your character(s). What do you do?"
+
+# Single global chat input (must be outside columns)
+user_input = st.chat_input(chat_prompt)
+
+# ---------- Handle input / world creation / DM interaction ----------
+
+if user_input:
+    # CASE 1: world not yet created -> treat input as world description
+    if not world_exists:
+        # Initial system + prompt will be set after world generation.
+        # For now, just show the player's description as a user message in the log.
+        desc_msg = Message(role="user", content=user_input, speaker="Player")
+        game.messages.append(desc_msg)
+
+        # Generate world + NPCs
+        with st.spinner("Forging your world..."):
+            world = generate_world_state(
+                setting_prompt=user_input,
+                players=st.session_state.player_names or ["Player"],
+                world_id=game_id,
+            )
+
+            save_world_state(world)
+            game.world = world
+
+            # Load any existing PCs for this world (if saved earlier)
+            game.player_characters = load_player_characters(world.world_id)
+
+            # Auto-generate NPCs once per world
+            if hasattr(game, "npcs"):
+                game.npcs = generate_npcs_for_world(world, max_npcs=10)
+                save_npcs(world.world_id, game.npcs)
+
+            players_str = (
+                ", ".join(world.players) if world.players else "Unnamed adventurers"
+            )
+
+            system_prompt = DM_SYSTEM_PROMPT_TEMPLATE.format(
+                title=world.title,
+                world_summary=world.world_summary,
+                lore=world.lore,
+                players=players_str,
+            )
+
+            # Reset message history to world-based system + intro
+            game.messages = [
+                Message(role="system", content=system_prompt, speaker=None)
+            ]
+
+            intro = (
+                f"Very well. We will play in the world of **{world.title}**.\n\n"
+                f"{world.world_summary}\n\n"
+                "You stand at the beginning of a new adventure. "
+                "Tell me who you are and what you are doing as the story opens."
+            )
+
+            game.messages.append(
+                Message(
+                    role="assistant",
+                    content=intro,
+                    speaker="Dungeon Master",
+                )
+            )
+
+    # CASE 2: world exists and PCs exist -> normal DM interaction
+    elif world_exists and pcs_exist:
+        # We decide who is speaking later inside the left column (UI selectbox),
+        # but we need a default speaker now in case current_speaker isn't set yet.
+        speaker = st.session_state.player_names[0] if st.session_state.player_names else "Player"
+
+        user_msg = Message(role="user", content=user_input, speaker=speaker)
+        game.messages.append(user_msg)
+
+        with st.spinner("The DM is thinking...."):
+            reply = chat_completion(
+                game.messages,
+                temperature=0.6,
+            )
+
+        dm_msg = Message(
+            role="assistant", content=reply, speaker="Dungeon Master"
+        )
+        game.messages.append(dm_msg)
+
+    # CASE 3: world exists but no PCs yet -> ignore input (we already tell the user via prompt)
+    else:
+        pass  # No-op; user should create characters first in Character Manager
+
+# After handling input, recompute state (world may now exist)
+world_exists = game.world is not None
+pcs_exist = bool(game.player_characters)
+# If we have PCs and no party summary yet, add one as a system message
+if world_exists and pcs_exist:
+    has_party_summary = any(
+        m.role == "system" and "PARTY SUMMARY" in m.content
+        for m in game.messages
+    )
+    if not has_party_summary:
+        summary_text = build_party_summary(game.player_characters)
+        if summary_text:
+            game.messages.append(
+                Message(
+                    role="system",
+                    content=summary_text,
+                    speaker=None,
+                )
+            )
+# ---------- Layout columns ----------
 
 left_col, right_col = st.columns([3, 1])
 
+# =========================
+# RIGHT COLUMN: TABLE INFO
+# =========================
+
+with right_col:
+    st.subheader("Table Info")
+
+    st.markdown(f"**Game ID:** `{game_id}`")
+    st.markdown("Share this with other players so they join the same table.")
+    st.markdown("---")
+
+    st.markdown("**Local players at this browser:**")
+    if st.session_state.player_names:
+        for name in st.session_state.player_names:
+            st.markdown(f"- {name}")
+    else:
+        st.markdown("_No local player names defined._")
+
+    st.markdown("---")
+
+    world = game.world
+
+    # URLs for the other pages (these pages must exist under src/UI/pages/)
+    world_url = f"http://localhost:8501/world_info?game_id={game_id}"
+    char_url = f"http://localhost:8501/char_manager?game_id={game_id}"
+
+    # Buttons are always shown (even before world creation)
+    if st.button("Open World Information"):
+        components.html(
+            f"""
+            <script>
+                window.open("{world_url}", "_blank");
+            </script>
+            """,
+            height=0,
+        )
+
+    if st.button("Open Character Manager"):
+        components.html(
+            f"""
+            <script>
+                window.open("{char_url}", "_blank");
+            </script>
+            """,
+            height=0,
+        )
+
+    st.markdown("---")
+
+    if world is None:
+        st.info(
+            "Create a world first. Once the world is generated, you can create characters and NPCs."
+        )
+    else:
+        # quick NPC summary
+        npc_dict = getattr(game, "npcs", {}) or {}
+        npc_count = len(npc_dict)
+        st.markdown(f"**NPCs in this world:** {npc_count}")
+
+        if npc_count > 0:
+            sample_npcs = list(npc_dict.values())[:5]
+            st.markdown("Some NPCs:")
+            for npc in sample_npcs:
+                st.markdown(f"- **{npc.name}** ({npc.role}) in *{npc.location}*")
 
 # =========================
 # LEFT COLUMN: GAME LOG
@@ -141,7 +282,7 @@ with left_col:
     st.markdown(f"**Game ID:** `{game_id}`")
     st.caption("Share this ID with other players so they join the same game.")
 
-    # Initial DM greeting if no world and no assistant messages yet
+    # Initial greeting only if no world and no assistant messages at all
     if (
         game.world is None
         and not any(m.role == "assistant" for m in game.messages)
@@ -175,8 +316,7 @@ with left_col:
             with st.chat_message("assistant"):
                 st.markdown(msg.content)
 
-    # Who is speaking in THIS browser
-    current_speaker = None
+    # Speaker selection (only meaningful once PCs exist)
     if st.session_state.player_names:
         current_speaker = st.selectbox(
             "Who is speaking (local to this browser)?",
@@ -184,192 +324,7 @@ with left_col:
             index=0,
         )
     else:
+        current_speaker = None
         st.info("No local players defined, use the sidebar to add them.")
 
-    pcs_exist = bool(game.player_characters)
-    world_exists = game.world is not None
-
-    # Main chat input
-    if not world_exists:
-        user_input = st.chat_input(
-            "Describe the world to begin. This will be used to forge the campaign setting."
-        )
-    elif world_exists and not pcs_exist:
-        st.info(
-            "The world is created. Next, create at least one character on the right. "
-            "Once you have characters, you can start playing."
-        )
-        user_input = None
-    else:
-        user_input = st.chat_input("Play as your character(s). What do you do?")
-
-    if user_input:
-        # CASE 1: no world yet => treat as world description
-        if game.world is None:
-            desc_msg = Message(role="user", content=user_input, speaker="Player")
-            game.messages.append(desc_msg)
-
-            with st.chat_message("user"):
-                st.markdown(f"**Player:** {user_input}")
-
-            with st.chat_message("assistant"):
-                with st.spinner("Forging your world..."):
-                    # Use game_id as world_id so saves separate by table
-                    world = generate_world_state(
-                        setting_prompt=user_input,
-                        players=st.session_state.player_names or ["Player"],
-                        world_id=game_id,
-                    )
-
-                    save_world_state(world)
-                    game.world = world
-
-                    # Load any existing PCs for this world (if saved earlier)
-                    game.player_characters = load_player_characters(world.world_id)
-
-                    players_str = (
-                        ", ".join(world.players)
-                        if world.players
-                        else "Unnamed adventurers"
-                    )
-
-                    system_prompt = DM_SYSTEM_PROMPT_TEMPLATE.format(
-                        title=world.title,
-                        world_summary=world.world_summary,
-                        lore=world.lore,
-                        players=players_str,
-                    )
-
-                    # Reset message history to world-based system + intro
-                    game.messages = [
-                        Message(role="system", content=system_prompt, speaker=None)
-                    ]
-
-                    intro = (
-                        f"Very well. We will play in the world of **{world.title}**.\n\n"
-                        f"{world.world_summary}\n\n"
-                        "You stand at the beginning of a new adventure. "
-                        "Tell me who you are and what you are doing as the story opens."
-                    )
-                    st.markdown(intro)
-
-                    game.messages.append(
-                        Message(
-                            role="assistant",
-                            content=intro,
-                            speaker="Dungeon Master",
-                        )
-                    )
-
-        # CASE 2: world exists => normal DM interaction
-        else:
-            if not pcs_exist:
-                st.warning(
-                    "Create at least one character on the right before continuing."
-                )
-            else:
-                speaker = current_speaker or "Player"
-
-                user_msg = Message(role="user", content=user_input, speaker=speaker)
-                game.messages.append(user_msg)
-
-                with st.chat_message("user"):
-                    st.markdown(f"**{speaker}:** {user_input}")
-
-                with st.chat_message("assistant"):
-                    with st.spinner("The DM is thinking...."):
-                        reply = chat_completion(
-                            game.messages,
-                            temperature=0.6,
-                        )
-                        st.markdown(reply)
-
-                dm_msg = Message(
-                    role="assistant", content=reply, speaker="Dungeon Master"
-                )
-                game.messages.append(dm_msg)
-
-
-# =========================
-# RIGHT COLUMN: TABLE INFO + CHARACTERS
-# =========================
-
-#''' TRYING WITH THIS COMMENTED OUT!
-#with right_col:
-#    st.subheader("Table Info")
-
-#    st.markdown(f"**Game ID:** `{game_id}`")
-#    st.markdown("Share this with other players so they join the same table.")
-#    st.markdown("---")
-
-#    st.markdown("**Local players at this browser:**")
-#    if st.session_state.player_names:
-#        for name in st.session_state.player_names:
-#            st.markdown(f"- {name}")
-#    else:
-#        st.markdown("_No local player names defined._")#
-
-#    st.markdown("---")
-
-#    world = game.world
-#    if world is None:
-#        st.info("Create a world first. Once the world is generated, you can create characters here.")
-#    
-#    if st.button("World Information"):
-#        wb.open_new_tab(f"http://localhost:8501/world_info?game_id={game_id}")
-        
-        
-#        st.markdown("---")
-#        st.markdown("### Characters")
-#'''
-
-with right_col:
-    st.subheader("Table Info")
-
-    st.markdown(f"**Game ID:** `{game_id}`")
-    st.markdown("Share this with other players so they join the same table.")
-    st.markdown("---")
-
-    st.markdown("**Local players at this browser:**")
-    if st.session_state.player_names:
-        for name in st.session_state.player_names:
-            st.markdown(f"- {name}")
-    else:
-        st.markdown("_No local player names defined._")
-
-    st.markdown("---")
-
-    world = game.world
-    if world is None:
-        st.info("Create a world first. Once the world is generated, you can create characters here.")
-    else:
-
-        # --- OPEN IN NEW TAB BUTTONS ---
-        world_url = f"http://localhost:8501/world_info?game_id={game_id}"
-        char_url  = f"http://localhost:8501/char_manager?game_id={game_id}"
-
-        if st.button("Open World Information"):
-            components.html(
-                f"""
-                <script>
-                    window.open("{world_url}", "_blank");
-                </script>
-                """,
-                height=0,
-            )
-
-        if st.button("Open Character Manager"):
-            components.html(
-                f"""
-                <script>
-                    window.open("{char_url}", "_blank");
-                </script>
-                """,
-                height=0,
-            )
-
-        st.markdown("---")
-        st.markdown(
-            "Use the buttons above to open detailed views in new tabs. "
-            "World Information shows the setting; Character Manager handles character creation and sheets."
-        )
+    

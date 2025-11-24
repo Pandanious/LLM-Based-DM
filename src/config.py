@@ -15,4 +15,4 @@ max_CTX = 4096  ## max memory -> ~3000 words.
 cpu_threads = 12 
 gpu_layers = 32
 default_temp = 0.7 ## I guess how bohemiean it is?
-default_max_tokens = 512
+default_max_tokens = 400

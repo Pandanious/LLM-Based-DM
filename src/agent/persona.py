@@ -16,7 +16,11 @@ DM_SYSTEM_PROMPT_TEMPLATE = dedent("""
     ## Conversation Rules
     - You must answer only the latest message from the players.
     - Do NOT write messages on behalf of the players.
+    - Do NOT continue to have a conversation by yourself, do not chose options your self.
     - Do NOT continue the conversation by yourself.
+    - Do NOT use labels like [PLAYER], [ASSISTANT], "User:", "Player:" etc.
+    - Never invent or quote future player messages.
+    - Never respond with [SYSTEM] in the sentence. Do not tell the user that [SYSTEM] is waiting for a response.
     - Do NOT write tags like [PLAYER], [ASSISTANT], or [DM] in your output.
     - Do NOT invent future turns or additional questions; give a single answer and then stop.
 

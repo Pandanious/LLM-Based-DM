@@ -129,3 +129,59 @@ class PlayerCharacter:
             created_on=created_on,
             last_updated=last_updated,
         )
+    
+
+@dataclass
+class NPC:
+    npc_id: str
+    world_id: str
+
+    name: str
+    role: str
+    location: str
+
+    desc: str
+    hooks: List[str] = field(default_factory=list)
+    attitude: str = "neutral"
+    tags: List[str] = field(default_factory=list)
+    
+    created_on: datetime = field(default_factory=datetime.utcnow)
+    last_updated: Optional[datetime] = None
+
+    def to_dict(self) -> dict:
+        data = asdict(self)
+        if isinstance(self.created_on, datetime):
+            data["created_on"] = self.created_on.isoformat()
+        if isinstance(self.last_updated, datetime):
+            data["last_updated"] = self.last_updated.isoformat()
+        return data
+    
+    @classmethod
+    def from_dict(cls, data: dict) -> "NPC":
+        created_raw = data.get("created_on")
+        updated_raw = data.get("last_updated")
+
+        created_on = (
+            datetime.fromisoformat(created_raw)
+            if isinstance(created_raw, str)
+            else datetime.utcnow()
+        )
+        last_updated = (
+            datetime.fromisoformat(updated_raw)
+            if isinstance(updated_raw, str)
+            else None
+        )
+
+        return cls(
+            npc_id=data["npc_id"],
+            world_id=data["world_id"],
+            name=data["name"],
+            role=data.get("role", ""),
+            location=data.get("location", ""),
+            description=data.get("description", ""),
+            hooks=list(data.get("hooks", [])),
+            attitude=data.get("attitude", "neutral"),
+            tags=list(data.get("tags", [])),
+            created_on=created_on,
+            last_updated=last_updated,
+        )

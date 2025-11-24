@@ -39,6 +39,7 @@ Important style rules:
 - Keep each section short and focused.
 - Do NOT add extra sections or commentary.
 - Do NOT use backticks or code fences.
+- Do Not Repeat yourself, once you have comepleted your task.
 
 Write your answer in this format exactly (no extra commentary):
 
