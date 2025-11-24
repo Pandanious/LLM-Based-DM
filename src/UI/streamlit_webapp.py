@@ -10,6 +10,8 @@ if str(ROOT) not in sys.path:
 import streamlit as st
 import streamlit.components.v1 as components
 
+#imports from other .py files
+
 from src.agent.persona import DM_SYSTEM_PROMPT_TEMPLATE
 from src.agent.types import Message
 from src.llm_client import chat_completion
@@ -20,6 +22,9 @@ from src.game.player_store import load_player_characters
 from src.agent.npc_gen import generate_npcs_for_world
 from src.game.npc_store import save_npcs
 from src.agent.party_summary import build_party_summary
+from src.agent.dm_dice import dm_turn_with_dice
+
+
 
 st.set_page_config(page_title="Local RPG Dungeon Master", layout="wide")
 st.title("Local Dungeon Master")
@@ -170,15 +175,17 @@ if user_input:
         game.messages.append(user_msg)
 
         with st.spinner("The DM is thinking...."):
-            reply = chat_completion(
-                game.messages,
-                temperature=0.6,
-            )
-
-        dm_msg = Message(
-            role="assistant", content=reply, speaker="Dungeon Master"
-        )
-        game.messages.append(dm_msg)
+        # Example extra condition: only allow dice if user input starts with "/action"
+            if user_input.startswith("/action"):
+                game.messages = dm_turn_with_dice(game.messages)
+            else:
+                # pure narrative DM, no dice system allowed
+                reply = chat_completion(
+                    game.messages,
+                    temperature=0.6,)
+                dm_msg = Message(
+                    role="assistant", content=reply, speaker="Dungeon Master")
+                game.messages.append(dm_msg)
 
     # CASE 3: world exists but no PCs yet -> ignore input (we already tell the user via prompt)
     else:

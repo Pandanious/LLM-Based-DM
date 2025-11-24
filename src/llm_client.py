@@ -76,7 +76,7 @@ def chat_completion(
         top_p=0.9,
         top_k=40,
         repeat_penalty=1.1,
-        #stop=["[PLAYER", "[ASSISTANT", "[DM]", "</s>"]
+        stop=["[PLAYER", "[ASSISTANT", "[DM", "[SYSTEM", "</s>"]
         )
 
     choices = result.get("choices", [])

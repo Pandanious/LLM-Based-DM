@@ -4,7 +4,7 @@ import re
 from dataclasses import dataclass
 from typing import List
 
-DICE_PATTERN = re.compile(r"^\s*(\d*)d(\d+)\s*([+-]\s*\d+)?\s*$")
+DICE_PATTERN = re.compile(r"^\s*(\d*)d(\d+)\s*([+-]\s*\d+)?\s*$")  #the actual dice thorw like 2d6+3
 
 @dataclass
 class DiceRollResult:
@@ -37,3 +37,5 @@ def roll_dice(expression: str, reason: str | None = None):
         total=total,
         reason=reason,
     )
+
+

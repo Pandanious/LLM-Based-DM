@@ -82,8 +82,7 @@ def generate_character_sheet(
     pc_id: str,
     char_name: str,
     gender: str,
-    ancestry: str,
-) -> PlayerCharacter:
+    ancestry: str,) -> PlayerCharacter:
     
     # Use the LLM to generate a medium-detailed character sheet, keeping name, gender, and ancestry fixed, and picking skills from the world's skill list.
     
@@ -109,6 +108,7 @@ def generate_character_sheet(
         top_p=0.9,
         top_k=40,
         repeat_penalty=1.15,
+        stop=["\n\nNAME:"],
     )
 
     raw = result["choices"][0]["text"].strip()
