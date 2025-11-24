@@ -39,7 +39,7 @@ def get_llm() -> Llama:
         n_ctx=max_CTX,
         n_threads=cpu_threads,
         n_gpu_layers=gpu_layers,
-        verbose=False,
+        verbose=True,
     )
 
 
