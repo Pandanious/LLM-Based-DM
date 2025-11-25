@@ -5,22 +5,26 @@ from typing import Dict, List
 
 from src.llm_client import get_llm
 from src.game.models import PlayerCharacter
+from src.game.dice import roll_dice
 
 
-CHAR_GEN_PROMPT_TEMPLATE = dedent("""
+END_MARKER = "<<CHARACTER_SHEET_COMPLETE>>"
+
+
+CHAR_GEN_PROMPT_TEMPLATE = dedent(f"""
 You are helping a player create a tabletop RPG character.
 
 The game is set in this world:
-{world_summary}
+{{world_summary}}
 
-The human player at the table is named {player_name}.
+The human player at the table is named {{player_name}}.
 They have already chosen these fixed details for their character:
-- Character name: {char_name}
-- Gender: {gender}
-- Ancestry: {ancestry}
+- Character name: {{char_name}}
+- Gender: {{gender}}
+- Ancestry: {{ancestry}}
 
 The player describes the character idea as:
-"{character_prompt}"
+"{{character_prompt}}"
 
 Your job:
 - Keep the NAME, GENDER and ANCESTRY exactly as given. Do not change them.
@@ -29,7 +33,7 @@ Your job:
 - Use a simple stat system with STR, DEX, CON, INT, WIS, CHA (values between 3 and 18).
 - Set LEVEL = 1.
 - Choose 3–6 appropriate skills from this list of skills in the world:
-  {world_skills}
+  {{world_skills}}
 - Give a reasonable MAX HP value for a level 1 character.
 - Suggest a small starting INVENTORY (3–6 items).
 
@@ -39,8 +43,10 @@ Important style rules:
 - Keep each section short and focused.
 - Do NOT add extra sections or commentary.
 - Do NOT use backticks or code fences.
-- Do Not Repeat yourself, once you have completed your task.
-- Generate exactly ONE character sheet in the specified format and then stop. Do NOT start a second sheet.
+- Generate **exactly ONE** character sheet.
+- Do NOT repeat fields you have already created.
+- After producing the sheet, end your answer with the EXACT line:
+  END: {END_MARKER}
 
 Write your answer in this format exactly (no extra commentary):
 
@@ -72,8 +78,9 @@ INVENTORY:
 - <item 1>
 - <item 2>
 - <item 3>
-""")
 
+END: {END_MARKER}
+""")
 
 def generate_character_sheet(
     world_summary: str,
@@ -85,10 +92,9 @@ def generate_character_sheet(
     gender: str,
     ancestry: str,
 ) -> PlayerCharacter:
-    """
-    Use the LLM to generate a medium-detailed character sheet, keeping name, gender,
-    and ancestry fixed, and picking skills from the world's skill list.
-    """
+    
+    # Use the LLM to generate a medium-detailed character sheet, keeping name, gender,
+    # and ancestry fixed, and picking skills from the world's skill list.
     llm = get_llm()
 
     skills_str = ", ".join(world_skills) if world_skills else "no specific skills listed"
@@ -105,7 +111,7 @@ def generate_character_sheet(
 
     result = llm(
         prompt,
-        max_tokens=400,
+        max_tokens=600,
         temperature=0.65,   # a bit lower for more discipline
         top_p=0.9,
         top_k=40,
@@ -113,6 +119,8 @@ def generate_character_sheet(
     )
 
     raw = result["choices"][0]["text"].strip()
+    raw = raw.replace(f"END: {END_MARKER}", "").strip()
+    raw = raw.replace("END: ", "").strip()
 
     return _parse_character_text(
         raw_text=raw,
@@ -123,17 +131,16 @@ def generate_character_sheet(
         fixed_ancestry=ancestry,
     )
 
-
 def _parse_stat_block(block: str) -> Dict[str, int]:
     stats: Dict[str, int] = {}
     pattern = re.compile(r"(STR|DEX|CON|INT|WIS|CHA)\s*:\s*(\d+)", re.IGNORECASE)
     for stat, value in pattern.findall(block):
         stats[stat.upper()] = int(value)
 
-    # ensure all keys exist with some default
     for key in ["STR", "DEX", "CON", "INT", "WIS", "CHA"]:
         stats.setdefault(key, 10)
     return stats
+
 
 
 def _parse_list_block(block: str) -> List[str]:
@@ -157,11 +164,8 @@ def _parse_list_block(block: str) -> List[str]:
 
 
 def _dedupe_sentences(text: str, max_sentences: int = 4) -> str:
-    """
-    Split on sentence boundaries, remove exact or near-exact duplicates,
-    and keep at most max_sentences.
-    """
-    # crude sentence split on . ! ?
+    
+    # crude sentence split on . ! and remove same text. ?
     parts = re.split(r"([\.!?])", text)
     sentences = []
     current = ""
@@ -198,12 +202,10 @@ def _parse_character_text(
     player_name: str,
     fixed_name: str,
     fixed_gender: str,
-    fixed_ancestry: str,
-) -> PlayerCharacter:
-    """
-    Parse the LLM's character text into a PlayerCharacter. Keeps name, gender,
-    ancestry fixed to user choices. Also de-duplicates repeated concept sentences.
-    """
+    fixed_ancestry: str,) -> PlayerCharacter:
+    
+    #Parse the LLM's character text into a PlayerCharacter. Keeps name, gender etc user choices.
+    
     text = raw_text.strip()
 
     # Archetype and level
@@ -264,7 +266,13 @@ def _parse_character_text(
         inventory=inventory,
         notes=[],
         created_on=now,
-        last_updated=now,
-    )
+        last_updated=now,    )
+
+    try:
+        init_result = roll_dice("1d20", reason="Initial initiative")
+        pc.initiative = init_result.total
+    except Exception:
+        # Fallback so we never crash char generation
+        pc.initiative = 0
 
     return pc

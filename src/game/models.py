@@ -81,11 +81,13 @@ class PlayerCharacter:
     stats: Dict[str, int]     # {"STR": 12, "DEX": 14, ...}
     max_hp: int
     current_hp: int
+    initiative: int = 0
     skills: List[str] = field(default_factory=list)
     inventory: List[str] = field(default_factory=list)
     notes: List[str] = field(default_factory=list)
     created_on: datetime = field(default_factory=datetime.utcnow)
     last_updated: Optional[datetime] = None
+    
 
     def to_dict(self) -> dict:
         data = asdict(self)
@@ -122,6 +124,7 @@ class PlayerCharacter:
             concept=data.get("concept", ""),
             stats={k: int(v) for k, v in data.get("stats", {}).items()},
             max_hp=int(data.get("max_hp", 10)),
+            initiative=int(data.get("initiative", 0)),
             current_hp=int(data.get("current_hp", 10)),
             skills=list(data.get("skills", [])),
             inventory=list(data.get("inventory", [])),
@@ -185,3 +188,5 @@ class NPC:
             created_on=created_on,
             last_updated=last_updated,
         )
+    
+    

@@ -15,10 +15,12 @@ def build_party_summary(pcs: Dict[str, PlayerCharacter]) -> str:
     ]
 
     for pc in pcs.values():
+        init_value = getattr(pc, "initiative", 0)
         line = (
             f"- Player: {pc.player_name} | "
             f"Character: {pc.name}, Level {pc.level} {pc.ancestry} {pc.archetype}. "
             f"Concept: {pc.concept.strip()}"
+            f"(Initiative {init_value})."
         )
         lines.append(line)
 

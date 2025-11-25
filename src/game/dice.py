@@ -1,39 +1,40 @@
 from __future__ import annotations
+
 import random
 import re
 from dataclasses import dataclass
 from typing import List
 
-DICE_PATTERN = re.compile(r"^\s*(\d*)d(\d+)\s*([+-]\s*\d+)?\s*$")
+
+ROLL_RE = re.compile(
+    r"^\s*(?P<num>\d*)d(?P<sides>\d+)(?P<mod>[+-]\d+)?\s*$",
+    re.IGNORECASE,
+)
+
 
 @dataclass
-class DiceRollResult:
-    expression: str    # like 2d4 + 3 # standard rpg types
-    rolls: List[str]   # like [3,5] etc.
-    modifier: int       
-    total: int 
-    reason: str | None = None
+class RollResult:
+    expression: str
+    total: int
+    rolls: List[int]
+    modifier: int
 
-def roll_dice(expression: str, reason: str | None = None):
 
-    match = DICE_PATTERN.match(expression)
-    if not match:
-        raise ValueError(f"Invalid dice expression: {expression!r}")
+def roll_dice(expr: str) -> RollResult:
+    """
+    Parse dice expression like "1d20+3" or "2d6-1" and roll it.
 
-    count_str, sides_str, mod_str = match.groups()
-    count = int(count_str) if count_str else 1
-    sides = int(sides_str)
-    modifier = 0
-    if mod_str:
-        modifier = int(mod_str.replace(" ", ""))  # "+ 3" -> "+3"
+    Returns RollResult(expression, total, rolls, modifier).
+    """
+    m = ROLL_RE.match(expr)
+    if not m:
+        raise ValueError(f"Invalid dice expression: {expr!r}")
 
-    rolls = [random.randint(1, sides) for _ in range(count)]
-    total = sum(rolls) + modifier
+    num = int(m.group("num") or "1")
+    sides = int(m.group("sides"))
+    mod = int(m.group("mod") or "0")
 
-    return DiceRollResult(
-        expression=expression,
-        rolls=rolls,
-        modifier=modifier,
-        total=total,
-        reason=reason,
-    )
+    rolls = [random.randint(1, sides) for _ in range(num)]
+    total = sum(rolls) + mod
+
+    return RollResult(expression=expr.strip(), total=total, rolls=rolls, modifier=mod)

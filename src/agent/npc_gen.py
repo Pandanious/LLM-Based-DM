@@ -1,182 +1,356 @@
+from __future__ import annotations
 
 import re
+import uuid
+import random
 from datetime import datetime
 from textwrap import dedent
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from src.llm_client import get_llm
 from src.game.models import World_State, NPC
 
-NPC_GEN_PROMPT_TEMPLATE = dedent("""
-You are an experienced tabletop RPG designer.
 
-The following is a campaign world. Create a cast of NPCs who belong in it.
+NPC_GEN_PROMPT_TEMPLATE = dedent("""
+You are an experienced tabletop RPG worldbuilder and NPC designer.
+
+The campaign world is described below.
 
 WORLD SUMMARY:
 {world_summary}
 
-LORE (excerpt):
-{lore_excerpt}
+LORE:
+{lore}
 
 MAJOR LOCATIONS:
-{major_locations_text}
+{major_locations}
 
 MINOR LOCATIONS:
-{minor_locations_text}
+{minor_locations}
 
-TASK:
-- Create 6–10 distinct NPCs.
-- Spread them across the locations above (major and minor).
-- Mix roles: quest-givers, merchants, local leaders, villains, informants, weirdos.
-- Include at least 2 NPCs with obvious quest hooks and secrets.
-- All NPCs should fit the tone and themes of the world.
+Players in this world:
+{players}
 
-OUTPUT FORMAT (no extra commentary, no backticks, no code):
+Your task:
+- Create a roster of important NPCs for this world.
+- Focus on interesting personalities, clear roles, and strong hooks that invite interaction.
+- Prefer to place NPCs in **minor locations** first, then major locations if needed.
 
-NPC 1
-NAME: <name>
-ROLE: <short role or archetype>
-LOCATION: <one of the locations above>
-ATTITUDE: <friendly/hostile/cautious/etc.>
-TAGS: <comma-separated tags>
+NPC requirements:
+- You MUST output **at least {min_npcs} distinct NPCs**.
+- Try to keep the total under {max_npcs_hint} unless the location coverage rules require more.
+- For EACH minor location, there must be at least:
+  - one merchant-type NPC (trader, vendor, shopkeeper, fixer)
+  - one leader-type NPC (mayor, boss, captain, elder, manager)
+  - one quest-giver NPC (someone who offers tasks, jobs, missions, contracts)
 
-DESCRIPTION:
-<2–4 sentences about personality, mannerisms, goals>
+Output format:
+- Write one NPC after another in this exact structure:
 
-HOOKS:
-- <plot hook 1>
-- <plot hook 2>
+NPC 1:
+Name: <short unique name>
+Role: <short role label, e.g. "merchant", "gang leader", "quest giver", "bartender">
+Location: <one of the locations listed above (major or minor)>
+Description: <2–4 sentences of flavor>
+Hooks:
+- <one hook sentence>
+- <optional second hook>
+Attitude: <one word or short phrase, e.g. "friendly", "hostile", "greedy">
+Tags:
+- <tag 1>
+- <tag 2>
 
-NPC 2
-NAME: ...
+NPC 2:
+Name: ...
 ...
 
-Do NOT explain what you are doing.
-Do NOT include system-level commentary.
-Just output the NPC blocks in the format above.
+Important style rules:
+- Do NOT add extra sections or commentary.
+- Do NOT write code.
+- Do NOT repeat the world summary or lore.
+- Only use the fields shown above for each NPC.
+- Ensure that merchants / leaders / quest givers are clearly labeled in the Role or Tags.
 """)
 
-def generate_npcs_for_world(world: World_State, max_npcs: int = 10) -> Dict[str,NPC]:
-    # generates NPCs based on world_state data. Returns a dict npc_id.
+NPC_HEADER_RE = re.compile(r"^NPC\s+(\d+):\s*$", re.MULTILINE)
 
+
+def _format_locations(locations: List[Dict[str, str]]) -> str:
+    if not locations:
+        return "- (none listed)"
+    lines = []
+    for loc in locations:
+        name = loc.get("name", "Unnamed location")
+        desc = loc.get("description", "").strip()
+        if desc:
+            lines.append(f"- {name}: {desc}")
+        else:
+            lines.append(f"- {name}")
+    return "\n".join(lines)
+
+
+def _split_npc_chunks(text: str) -> List[str]:
+    """
+    Split the LLM output into chunks, one per NPC, based on 'NPC X:' headers.
+    """
+    matches = list(NPC_HEADER_RE.finditer(text))
+    if not matches:
+        return []
+
+    chunks: List[str] = []
+    for i, m in enumerate(matches):
+        start = m.start()
+        end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
+        chunk = text[start:end].strip()
+        if chunk:
+            chunks.append(chunk)
+    return chunks
+
+
+def _parse_field(pattern: str, text: str) -> str:
+    m = re.search(pattern, text, re.IGNORECASE | re.MULTILINE)
+    if not m:
+        return ""
+    return m.group(1).strip()
+
+
+def _parse_list_block(label: str, text: str) -> List[str]:
+    """
+    Extract a bullet list under a label like 'Hooks:' or 'Tags:'.
+    """
+    pattern = rf"{label}:\s*(.+?)(?:\n\w+:|\Z)"
+    m = re.search(pattern, text, re.IGNORECASE | re.DOTALL)
+    if not m:
+        return []
+    block = m.group(1)
+    items: List[str] = []
+    seen = set()
+    for raw_line in block.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        if line.startswith("-") or line.startswith("•"):
+            line = line[1:].strip()
+        if not line:
+            continue
+        lower = line.lower()
+        if lower in seen:
+            continue
+        seen.add(lower)
+        items.append(line)
+    return items
+
+
+def _pick_location_name(world: World_State, preferred: Optional[str]) -> str:
+    """
+    Try to map a free-text location name back to one of the world's major/minor
+    location names. If we can't, just return the preferred text or a fallback.
+    """
+    all_names: List[str] = []
+    for loc in (world.major_locations or []):
+        name = loc.get("name")
+        if name:
+            all_names.append(name)
+    for loc in (world.minor_locations or []):
+        name = loc.get("name")
+        if name:
+            all_names.append(name)
+
+    if not all_names and preferred:
+        return preferred
+
+    if preferred:
+        # simple fuzzy-ish match by lowercase containment
+        p = preferred.lower()
+        for name in all_names:
+            if p == name.lower() or p in name.lower() or name.lower() in p:
+                return name
+
+    if all_names:
+        return random.choice(all_names)
+
+    return preferred or "Unknown location"
+
+
+def _ensure_minimum_npcs(
+    world: World_State,
+    npcs: Dict[str, NPC],
+    min_npcs: int,
+) -> None:
+    """
+    If the LLM produced fewer than min_npcs, pad with generic filler NPCs.
+    """
+    if len(npcs) >= min_npcs:
+        return
+
+    all_locations = (world.minor_locations or []) + (world.major_locations or [])
+    if not all_locations:
+        base_locations = ["Unknown location"]
+    else:
+        base_locations = [loc.get("name", "Unknown location") for loc in all_locations]
+
+    while len(npcs) < min_npcs:
+        npc_id = f"auto_{uuid.uuid4().hex[:8]}"
+        loc = random.choice(base_locations)
+        now = datetime.utcnow()
+        npcs[npc_id] = NPC(
+            npc_id=npc_id,
+            world_id=world.world_id,
+            name=f"Extra NPC {len(npcs) + 1}",
+            role="Villager",
+            location=loc,
+            desc="A filler NPC created automatically to reach the minimum count.",
+            hooks=[],
+            attitude="neutral",
+            tags=["filler"],
+            created_on=now,
+            last_updated=now,
+        )
+
+
+def _ensure_roles_per_minor_location(world: World_State, npcs: Dict[str, NPC]) -> None:
+    """
+    Ensure that each minor location has at least one merchant / leader / quest giver.
+    If missing, create simple NPCs with those roles.
+    """
+    role_keywords = {
+        "merchant": ["merchant", "trader", "vendor", "shopkeeper", "fixer"],
+        "leader": ["leader", "mayor", "boss", "captain", "elder", "manager"],
+        "quest": ["quest", "mission", "job giver", "contract broker", "dispatcher"],
+    }
+
+    # Pre-build an index of NPCs by location
+    by_location: Dict[str, List[NPC]] = {}
+    for npc in npcs.values():
+        by_location.setdefault(npc.location, []).append(npc)
+
+    for loc in (world.minor_locations or []):
+        loc_name = loc.get("name", "Unknown location")
+        npcs_here = by_location.get(loc_name, [])
+
+        lower_roles = []
+        for npc in npcs_here:
+            text = f"{npc.role} {' '.join(npc.tags)}".lower()
+            lower_roles.append(text)
+
+        def has_role(kind: str) -> bool:
+            keywords = role_keywords[kind]
+            for text in lower_roles:
+                for kw in keywords:
+                    if kw in text:
+                        return True
+            return False
+
+        needed = []
+        if not has_role("merchant"):
+            needed.append("merchant")
+        if not has_role("leader"):
+            needed.append("leader")
+        if not has_role("quest"):
+            needed.append("quest giver")
+
+        for kind in needed:
+            npc_id = f"auto_{uuid.uuid4().hex[:8]}"
+            now = datetime.utcnow()
+            role_label = kind
+            tags = [kind.replace(" ", "_"), "auto_generated"]
+            desc = (
+                f"A local {kind} for {loc_name}, created automatically to ensure "
+                f"every minor location has key NPC roles."
+            )
+            npcs[npc_id] = NPC(
+                npc_id=npc_id,
+                world_id=world.world_id,
+                name=f"{loc_name} {kind.title()}",
+                role=role_label,
+                location=loc_name,
+                desc=desc,
+                hooks=[],
+                attitude="neutral",
+                tags=tags,
+                created_on=now,
+                last_updated=now,
+            )
+
+
+def generate_npcs_for_world(world: World_State, max_npcs: int = 10) -> Dict[str, NPC]:
+    """
+    Ask the LLM to suggest a roster of NPCs for the given world, then enforce
+    minimum counts and per-location role coverage.
+
+    Returns a dict npc_id -> NPC.
+    """
     llm = get_llm()
 
-    major_locations_text = "\n".join(
-        f"- {loc.get('name','Unnamed')}: {loc.get('description','')}"
-        for loc in world.major_locations
-    ) or "(none listed)"
+    major_locations_str = _format_locations(world.major_locations)
+    minor_locations_str = _format_locations(world.minor_locations)
+    players_str = ", ".join(world.players) if world.players else "Unknown players"
 
-    minor_locations_text = "\n".join(
-        f"- {loc.get('name','Unnamed')}: {loc.get('description','')}"
-        for loc in world.minor_locations
-    ) or "(none listed)"
-
-    lore_excerpt = world.lore[:1200]
+    # We treat max_npcs as a soft upper bound. The LLM is asked for at least
+    # min_npcs_base, and we may add more during role enforcement.
+    min_npcs_base = max_npcs  # you can change this if you want room for padding
 
     prompt = NPC_GEN_PROMPT_TEMPLATE.format(
         world_summary=world.world_summary,
-        lore_excerpt=lore_excerpt,
-        major_locations_text=major_locations_text,
-        minor_locations_text=minor_locations_text,
+        lore=world.lore,
+        major_locations=major_locations_str,
+        minor_locations=minor_locations_str,
+        players=players_str,
+        min_npcs=min_npcs_base,
+        max_npcs_hint=max_npcs + 5,
     )
 
     result = llm(
         prompt,
-        max_tokens=700,
-        temperature=0.8,
+        max_tokens=900,
+        temperature=0.85,
         top_p=0.9,
         top_k=40,
         repeat_penalty=1.1,
     )
 
     raw = result["choices"][0]["text"].strip()
-    return _parse_npc_blocks(raw, world, max_npcs=max_npcs)
 
-def _parse_npc_blocks(text: str, world: World_State, max_npcs: int = 10) -> Dict[str, NPC]:
-    """
-    Parse NPC blocks from output.
-    """
-    lines = text.splitlines()
-
+    chunks = _split_npc_chunks(raw)
     npcs: Dict[str, NPC] = {}
-    current_block: List[str] = []
 
-    for line in lines:
-        if re.match(r"^NPC\s+\d+", line.strip(), flags=re.IGNORECASE):
-            # Start of new NPC block
-            if current_block:
-                npc = _parse_single_npc("\n".join(current_block), world)
-                if npc:
-                    npcs[npc.npc_id] = npc
-                    if len(npcs) >= max_npcs:
-                        return npcs
-                current_block = []
-            current_block.append(line)
-        else:
-            current_block.append(line)
+    for i, chunk in enumerate(chunks, start=1):
+        name = _parse_field(r"^Name:\s*(.+)$", chunk)
+        role = _parse_field(r"^Role:\s*(.+)$", chunk)
+        loc_raw = _parse_field(r"^Location:\s*(.+)$", chunk)
+        desc = _parse_field(r"^Description:\s*(.+)$", chunk)
 
-    # flush last one
-    if current_block and len(npcs) < max_npcs:
-        npc = _parse_single_npc("\n".join(current_block), world)
-        if npc:
-            npcs[npc.npc_id] = npc
+        hooks = _parse_list_block("Hooks", chunk)
+        tags = _parse_list_block("Tags", chunk)
+        attitude = _parse_field(r"^Attitude:\s*(.+)$", chunk) or "neutral"
+
+        location = _pick_location_name(world, loc_raw or "")
+
+        if not name:
+            # Skip obviously malformed entries
+            continue
+
+        npc_id = f"{world.world_id}_npc_{i}"
+        now = datetime.utcnow()
+
+        npcs[npc_id] = NPC(
+            npc_id=npc_id,
+            world_id=world.world_id,
+            name=name,
+            role=role or "NPC",
+            location=location,
+            desc=desc or "",
+            hooks=hooks,
+            attitude=attitude,
+            tags=tags,
+            created_on=now,
+            last_updated=now,
+        )
+
+    # Enforce minimum base NPC count
+    _ensure_minimum_npcs(world, npcs, min_npcs_base)
+
+    # Enforce per-minor-location role coverage
+    _ensure_roles_per_minor_location(world, npcs)
 
     return npcs
-
-
-def _parse_single_npc(block: str, world: World_State) -> NPC | None:
-    name_match = re.search(r"NAME:\s*(.+)", block, flags=re.IGNORECASE)
-    if not name_match:
-        return None
-
-    role_match = re.search(r"ROLE:\s*(.+)", block, flags=re.IGNORECASE)
-    loc_match = re.search(r"LOCATION:\s*(.+)", block, flags=re.IGNORECASE)
-    att_match = re.search(r"ATTITUDE:\s*(.+)", block, flags=re.IGNORECASE)
-    tags_match = re.search(r"TAGS:\s*(.+)", block, flags=re.IGNORECASE)
-
-    desc_match = re.search(
-        r"DESCRIPTION:\s*(.+?)(?:\nHOOKS:|\Z)",
-        block,
-        flags=re.IGNORECASE | re.DOTALL,
-    )
-    hooks_match = re.search(
-        r"HOOKS:\s*(.+)",
-        block,
-        flags=re.IGNORECASE | re.DOTALL,
-    )
-
-    name = name_match.group(1).strip()
-    role = role_match.group(1).strip() if role_match else ""
-    location = loc_match.group(1).strip() if loc_match else ""
-    attitude = att_match.group(1).strip() if att_match else "neutral"
-
-    tags_raw = tags_match.group(1).strip() if tags_match else ""
-    tags = [t.strip() for t in tags_raw.split(",") if t.strip()]
-
-    desc = desc_match.group(1).strip() if desc_match else ""
-    hooks_block = hooks_match.group(1) if hooks_match else ""
-
-    hooks = []
-    for line in hooks_block.splitlines():
-        l = line.strip()
-        if l.startswith("-"):
-            l = l[1:].strip()
-        if l:
-            hooks.append(l)
-
-    npc_id = f"{world.world_id}_npc_{name.lower().replace(' ', '_')}"
-    now = datetime.utcnow()
-
-    return NPC(
-        npc_id=npc_id,
-        world_id=world.world_id,
-        name=name,
-        role=role,
-        location=location,
-        desc=desc,
-        hooks=hooks,
-        attitude=attitude,
-        tags=tags,
-        created_on=now,
-        last_updated=now,
-    )

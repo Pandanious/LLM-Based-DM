@@ -32,6 +32,8 @@ def render_character_card(pc) -> None:
         st.markdown(f"**Ancestry:** {pc.ancestry}")
         st.markdown(f"**Archetype:** {pc.archetype}")
         st.markdown(f"**HP:** {pc.current_hp} / {pc.max_hp}")
+        st.markdown(f"**Initiative:** {getattr(pc, 'initiative', '—')}")
+
 
         st.markdown("**Stats**")
         cols = st.columns(6)
@@ -73,12 +75,13 @@ st.markdown("---")
 st.subheader("Local Players at This Browser")
 
 # Initialize local_player_names from main app's player_names if present
+
 if "local_player_names" not in st.session_state:
     base = st.session_state.get("player_names", [])
     if base:
         st.session_state.local_player_names = list(base)
     else:
-        st.session_state.local_player_names = ["Alice", "Bob"]
+        st.session_state.local_player_names = [""]
 
 players_csv = st.text_input(
     "Player names (comma-separated, local to this browser)",
@@ -100,6 +103,7 @@ st.markdown("---")
 st.subheader("Create / Re-roll Characters for Local Players")
 
 # per char Ui
+
 for player_name in local_player_names:
     st.markdown(f"### Player: {player_name}")
 
@@ -174,6 +178,7 @@ for player_name in local_player_names:
             st.markdown("_Existing character sheet available below._")
 
     # Refresh existing_pc in case we just re-rolled
+    
     existing_pc = game.player_characters.get(pc_id)
     if existing_pc:
         render_character_card(existing_pc)

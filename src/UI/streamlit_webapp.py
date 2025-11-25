@@ -20,9 +20,17 @@ from src.agent.npc_gen import generate_npcs_for_world
 from src.game.npc_store import save_npcs
 from src.agent.party_summary import build_party_summary
 from src.agent.dm_dice import dm_turn_with_dice
+from src.game.party_store import save_party_summary
 
 st.set_page_config(page_title="Local RPG Dungeon Master", layout="wide")
+hide_pages = """<style>
+[data-testid="stSidebarNav"] { display: none; }
+</style>
+"""
+st.markdown(hide_pages, unsafe_allow_html=True)
 st.title("Local Dungeon Master")
+
+
 
 # ---------- Session-local UI state ----------
 
@@ -52,16 +60,28 @@ with st.sidebar:
 
     players_raw = st.text_input(
         "Player names (comma-separated, local to you)",
-        value="Alice, Bob",
+        value="Panda",
         help="Names of the human players at the table. Each browser can set its own list for the speaker dropdown.",
     )
 
-    startbutton = st.button("Start/Reset Game (for this Game ID)", type="primary")
+    startbutton = st.button("Reset Game (for this Game ID)", type="primary")
 
     if st.button("Reset the LLM Model"):
         from src.llm_client import reset_model
         reset_model()
         st.success("Model reloaded with fresh settings!")
+
+    if st.button("Help/How to Interact with this DM"):
+        help_url = f"http://localhost:8501/help?game_id={game_id}"
+        components.html(
+            f"""
+            <script>
+                window.open("{help_url}", "_blank");
+            </script>
+            """,
+            height=0,)
+
+
 
 # Parse player names (per browser)
 player_names = [p.strip() for p in players_raw.split(",") if p.strip()]
@@ -186,13 +206,30 @@ if user_input:
         # We decide who is speaking later inside the left column (UI selectbox),
         # but we need a default speaker now in case current_speaker isn't set yet.
         speaker = st.session_state.player_names[0] if st.session_state.player_names else "Player"
+        
+        normalized = user_input.strip().lower()
+        if normalized in {"start", "let's begin", "begin", "i am ready"}:
+            if len(game.player_characters) == 1:
+                pc = next(iter(game.player_characters.values()))
+                user_input = (
+                    "We are ready to begin the adventure. "
+                    f"Welcome to the world, {pc.name}, a level {pc.level} "
+                    f"{pc.ancestry} {pc.archetype}. "
+                    "You can describe the opening scene."
+                )
+            elif len(game.player_characters) > 1:
+                user_input = (
+                    "We are ready to begin the adventure. "
+                    "Introduce the existing party from the PARTY SUMMARY and describe "
+                    "the opening scene. Do NOT create any new characters."
+                )
 
         user_msg = Message(role="user", content=user_input, speaker=speaker)
         game.messages.append(user_msg)
 
         with st.spinner("The DM is thinking...."):
             # Let the DM respond (and optionally request/resolve dice) in one logical turn
-            game.messages = dm_turn_with_dice(game.messages)
+            game.messages = dm_turn_with_dice(game.messages, game.player_characters)
 
     # CASE 3: world exists but no PCs yet -> ignore input (we already tell the user via prompt)
     else:
@@ -231,6 +268,7 @@ with right_col:
     # URLs for the other pages (these pages must exist under src/UI/pages/)
     world_url = f"http://localhost:8501/world_info?game_id={game_id}"
     char_url = f"http://localhost:8501/char_manager?game_id={game_id}"
+    
 
     # Buttons are always shown (even before world creation)
     if st.button("Open World Information"):
@@ -240,8 +278,7 @@ with right_col:
                 window.open("{world_url}", "_blank");
             </script>
             """,
-            height=0,
-        )
+            height=0,)
 
     if st.button("Open Character Manager"):
         components.html(
@@ -250,27 +287,94 @@ with right_col:
                 window.open("{char_url}", "_blank");
             </script>
             """,
-            height=0,
-        )
+            height=0,)
+        
+    
+
+
 
     st.markdown("---")
 
+    if world is not None:
+        if st.button("Refresh Party Summary"):
+            # 1) Reload PCs from disk
+            from src.game.player_store import load_player_characters
+
+            pcs = load_player_characters(world.world_id)
+            game.player_characters = pcs
+
+            if not pcs:
+                st.warning("No player characters found on disk for this world.")
+            else:
+                # 2) Build fresh summary text
+                summary_text = build_party_summary(pcs)
+
+                if not summary_text:
+                    st.warning("Could not build a party summary (empty text).")
+                else:
+                    # 3) Remove any old PARTY SUMMARY system messages
+                    game.messages = [
+                        m
+                        for m in game.messages
+                        if not (m.role == "system" and "PARTY SUMMARY" in m.content)
+                    ]
+
+                    # 4) Append the new PARTY SUMMARY system message
+                    game.messages.append(
+                        Message(
+                            role="system",
+                            content=summary_text,
+                            speaker=None,
+                        )
+                    )
+
+                    # 5) Save summary to disk for inspection
+                    path = save_party_summary(world.world_id, summary_text)
+                    st.success(f"Party summary reloaded and saved to: {path}")
+    else:
+        st.info("No world yet – create a world before refreshing party summary.")
+
     if world is None:
         st.info(
-            "Create a world first. Once the world is generated, you can create characters and NPCs."
+            "No world created. Once the world is generated, you can create characters and NPCs."
         )
     else:
-        # quick NPC summary
+        # NPC overview
         npc_dict = getattr(game, "npcs", {}) or {}
         npc_count = len(npc_dict)
         st.markdown(f"**NPCs in this world:** {npc_count}")
 
-        if npc_count > 0:
-            sample_npcs = list(npc_dict.values())[:5]
-            st.markdown("Some NPCs:")
-            for npc in sample_npcs:
-                st.markdown(f"- **{npc.name}** ({npc.role}) in *{npc.location}*")
+        if npc_count == 0:
+            st.info("No NPCs generated yet.")
+        else:
+            # Group NPCs by location
+            npcs_by_location = {}
+            for npc_id, npc in npc_dict.items():
+                loc = getattr(npc, "location", "Unknown location")
+                npcs_by_location.setdefault(loc, []).append(npc)
 
+            with st.expander("Show NPCs by location", expanded=False):
+                for location in sorted(npcs_by_location.keys()):
+                    npcs_here = npcs_by_location[location]
+                    st.markdown(f"**{location}** ({len(npcs_here)} NPCs)")
+
+                    for npc in npcs_here:
+                        name = getattr(npc, "name", "Unnamed NPC")
+                        role = getattr(npc, "role", "Unknown role")
+
+                        # Simple highlight helpers for your “at least one merchant/leader/quest giver” rule
+                        role_lower = str(role).lower()
+                        highlight = ""
+                        if "merchant" in role_lower:
+                            highlight = " Merchant "
+                        elif "leader" in role_lower:
+                            highlight = " Leader "
+                        elif "quest" in role_lower:
+                            highlight = " Quest Giver"
+
+                        st.markdown(f"- **{name}** – {role}{highlight}")
+
+                    st.markdown("---")
 # =========================
 # LEFT COLUMN: GAME LOG
 # =========================
