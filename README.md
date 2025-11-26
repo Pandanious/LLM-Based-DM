@@ -1,33 +1,48 @@
+<!-- NOT YET FINAL-
+     README-IS-AI-GEN-BASED-ON-REPO-NEEDS-REFINEMENT -->
+
+
 # Local RPG Dungeon Master
 
-Local-first Streamlit toolkit for running a tabletop-style RPG session powered by a GGUF model through `llama-cpp-python`. The app handles worldbuilding, NPCs, character sheets, and a DM chat loop without calling any external APIs.
+Local-first Streamlit toolkit for running a tabletop-style RPG session powered by a local GGUF model through `llama-cpp-python`. Everything (worldbuilding, NPCs, quests, dice, sheets) runs on your machine; no external API calls.
 
-## Features
-- Worldbuilding: `src/agent/world_build.py` expands a one-line setting into a titled world summary, lore, locations, skills, and themes, then saves it to `saves/<game_id>.json`.
-- Character Manager: `src/UI/pages/char_manager.py` plus `src/agent/char_gen.py` turn player prompts into level 1 sheets (stats, skills, inventory) stored per world in `saves/<game_id>_players.json`.
-- NPC Roster: `src/agent/npc_gen.py` auto-creates 6-10 NPCs tied to locations and saves them under `saves/npcs/`.
-- Shared table state: `src/game/game_state.py` keeps chat history, PCs, NPCs, and world data keyed by a Game ID so multiple browser tabs share the same table.
-- DM persona and dice protocol: `src/agent/persona.py` forces the model to request rolls via `[ROLL_REQUEST: 1d20+3 | reason]`; helpers in `src/game/dice.py` and `src/game/md_dice_handler.py` parse and roll.
-- Multi-page UI: main chat at `src/UI/streamlit_webapp.py`, read-only world view at `src/UI/pages/world_info.py`, and character builder at `src/UI/pages/char_manager.py`.
+## What it does
+- World forge: first chat message creates a titled world with summary, lore, skills, themes, major/minor locations, and saves it under the chosen Game ID.
+- Roster building: generates an NPC list tied to locations plus a set of quests linked to those NPCs and places.
+- Character Manager: per-player character sheets with stats/skills/inventory, saved per world and re-loadable across browser tabs.
+- DM persona with server-side dice: `/action ...` prompts the DM to issue `[ROLL_REQUEST: ...]`; the app rolls with PC stats/difficulty heuristics, posts `[ROLL_RESULT ...]`, and has   the DM narrate outcomes.
+- Initiative + turn log: build turn order from PC initiatives, step through turns, and record actions with an exportable recap.
+- Save/load & summaries: refreshable party summary system message, bundle save/load for full state, and resettable LLM cache.
+- Multi-page UI: main chat plus World Info, Character Manager, Quest Log, NPC Overview, and Help pages that follow the current `game_id`.
 
 ## Setup
 1. Python 3.10+ recommended.
-2. Place a GGUF model in `model/` and set `model_path` (plus `cpu_threads`, `gpu_layers`) in `src/config.py`.
-3. Install deps (ideally in `.venv`): `pip install -r requirements.txt`.
+2. Place a GGUF model in `model/` and set `model_path`, `cpu_threads`, and `gpu_layers` in `src/config.py`.
+3. Install deps (ideally in a virtualenv): `pip install -r requirements.txt`.
+4. Optional: on Windows, `run_app.bat` launches Streamlit and an ngrok tunnel secured by `src/UI/policy.yaml` (basic auth).
 
 ## Run
-1. From repo root: `streamlit run src/UI/streamlit_webapp.py`.
-2. In the sidebar, pick a Game ID (shared across tabs) and enter local player names.
-3. First chat input describes the desired setting; the app forges the world, saves it, and loads generated NPCs.
-4. Open **Character Manager** (sidebar button) to create PCs for each local player, then return to the main page to play.
-5. Open **World Information** to view the generated lore, locations, and NPCs.
-6. Use **Start/Reset Game** to clear world/chat for the current Game ID or **Reset the LLM Model** if you change model config.
+1. From repo root: `streamlit run src/UI/streamlit_webapp.py` (or `run_app.bat` on Windows).
+2. In the sidebar, pick a **Game ID** (shared across tabs) and enter local player names. Use **Reset Game** if you want a clean slate for that ID.
+3. First chat input describes the setting; the app forges the world, NPC roster, and quests and saves them.
+4. Open **Character Manager** (sidebar button) to create/re-roll PCs for each local player; sheets auto-save per Game ID.
+5. Back on the main page, use **Refresh Party Summary** if PCs were added elsewhere, then play by chatting and using `/action ...` when you want mechanics.
+6. Use **World Info**, **Quest Log**, and **NPC Overview** pages for read-only reference; **Help** opens the in-app guide.
+
+## Gameplay notes
+- `/action <what you attempt>` triggers DM `[ROLL_REQUEST: ...]` lines. Supported action types: `attack`, `stealth_check`, `perception_check`, `lockpick`, `persuasion`, `athletics`, `acrobatics`, `damage_light`, `damage_heavy`. The app rolls using PC stats/skills and difficulty hints, then posts `[ROLL_RESULT ... outcome=success|failure ...]` before the DM narrates.
+- Quest commands in chat: `/quest list`, `/quest start <title fragment>`, `/quest complete <title fragment>`, `/quest fail <title fragment>`.
+- Initiative controls on the main page build turn order from PC initiatives; **Next Turn** advances and records a turn entry. The **Export action recap** button saves a JSON + text summary under `saves/snapshots/`.
+- Bundle saves: **Save world state** writes a one-file bundle of world/PCs/NPCs/quests/initiative; **Load world state** restores it and rebuilds DM/system prompts.
+- **Reset the LLM Model** clears the cached llama-cpp instance if you change model files or settings.
 
 ## Data locations
 - Worlds: `saves/<game_id>.json`
 - Player characters: `saves/<game_id>_players.json`
 - NPCs: `saves/npcs/<game_id>_npcs.json`
+- Quests: `saves/<game_id>_quests.json`
+- Party summary: `saves/<game_id>_party_summary.txt`
+- Turn log: `saves/turns/<game_id>_turns.json`
+- Action recap exports: `saves/snapshots/<game_id>_actions/`
+- Bundle saves: `saves/bundles/<timestamp>_<players>.json`
 
-## Notes
-- `src/agent/quest_gen.py` is a stub; quests are not yet generated.
-- DLL search paths for llama-cpp are pre-set in `src/llm_client.py` (Windows-friendly). Adjust if your CUDA/ggml layout differs.

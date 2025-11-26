@@ -45,10 +45,10 @@ st.markdown("---")
 st.header("1) Quick Start")
 st.markdown(
     """
-1. In the main app sidebar, enter a **Game ID** (everyone who uses the same ID shares the table) and click **Reset Game** if you want a clean slate.
-2. In the chat box, describe the **setting** you want. The app forges a titled world, lore, locations, NPC roster, and saves it under `saves/<game_id>.json`.
-3. Open **Character Manager** to create a sheet for each local player (name, ancestry, concept). Sheets are saved to `saves/<game_id>_players.json`.
-4. Return to the main page, click **Refresh Party Summary** if needed, then play by chatting in-character and using `/action ...` when you want mechanics.
+1. In the main sidebar, enter a **Game ID** (everyone using the same ID shares the table) and click **Reset Game** if you want a clean slate for that ID.
+2. In the chat box, describe the **setting** you want. The app forges a titled world with lore, locations, skills, NPC roster, and quests, then saves it under `saves/<game_id>.json`.
+3. Open **Character Manager** to create or re-roll a sheet for each local player (name, ancestry, concept). Sheets are saved to `saves/<game_id>_players.json`.
+4. Return to the main page, click **Refresh Party Summary** if you added PCs elsewhere, then play by chatting in-character and using `/action ...` when you want mechanics.
 """
 )
 
@@ -63,7 +63,9 @@ st.markdown(
     """
 - **Main page (Game Log):** chat with the DM, see history, and manage the table from the sidebar.
 - **Sidebar controls:** set **Game ID**, **Reset Game** (clears world/chat/PCs for that ID), and **Reset the LLM Model** if you change model config.
-- **World Information:** read-only world summary, lore, locations, and NPCs.
+- **Save world state / Load world state:** write or restore a one-file bundle of world, PCs, NPCs, quests, and initiative.
+- **Refresh Party Summary:** reload PCs from disk and inject the PARTY SUMMARY system prompt for the DM.
+- **World Information:** read-only world summary, lore, locations, themes, and NPCs.
 - **Character Manager:** generate or re-roll player characters tied to this Game ID.
 - **Quest Log:** read-only list of generated quests and their status.
 - **NPC Overview:** grouped list of NPCs by location.
@@ -84,7 +86,8 @@ st.markdown(
 - The very first chat message you send (when no world exists) should describe the desired setting, tone, or themes.
 - The app creates:
   - a world title and summary,
-  - lore plus major/minor locations,
+  - lore plus major/minor locations and themes,
+  - a world skill list,
   - an NPC roster placed at locations,
   - a starter set of quests tied to those NPCs and places.
 - All of this is shared across tabs that use the same **Game ID**.
@@ -102,6 +105,7 @@ st.markdown(
     """
 - Use **Character Manager** for each player name you enter (local to your browser) to generate a sheet.
 - Sheets include stats, skills, inventory, and are saved per world so they reload automatically.
+- Character sheets include an `initiative` value used when you build turn order.
 - Back on the main page, **Refresh Party Summary** pulls characters from disk and injects a `PARTY SUMMARY` system message so the DM respects existing PCs.
 - If the DM seems to forget your PC, refresh the summary and continue; do not recreate the character manually.
 """
@@ -132,7 +136,7 @@ st.header("6) Initiative and Turn Order")
 st.markdown(
     """
 - PCs have an `initiative` value on their sheet.
-- In the main page right column, use **Build Initiative Order** to sort PCs by initiative and set the first turn.
+- In the main page sidebar container, use **Build Initiative Order** to sort PCs by initiative and set the first turn.
 - Use **Next Turn** to advance to the next PC in the order; the current actor is shown above the Game Log.
 - No auto re-roll is provided; update initiatives on the sheets if you need to change them, then rebuild the order.
 """
@@ -181,10 +185,24 @@ st.markdown(
 st.markdown("---")
 
 # -------------------------
+# Action recap and exports
+# -------------------------
+
+st.header("9) Action Recap and Exports")
+st.markdown(
+    """
+- Each turn and `/action` is logged to a turn log. Use **Export action recap** on the main page to save a JSON plus text summary under `saves/snapshots/`.
+- The log includes turn order, actions, and any encounter notes captured during play.
+"""
+)
+
+st.markdown("---")
+
+# -------------------------
 # NPCs and world reference
 # -------------------------
 
-st.header("9) World Reference")
+st.header("10) World Reference")
 st.markdown(
     """
 - **World Information** shows the generated lore, themes, and major/minor locations.
@@ -196,10 +214,27 @@ st.markdown(
 st.markdown("---")
 
 # -------------------------
+# Saving, loading, and resets
+# -------------------------
+
+st.header("11) Saving, Loading, and Resets")
+st.markdown(
+    """
+- **Save world state** writes a bundle JSON of world, PCs, NPCs, quests, and initiative to `saves/bundles/`.
+- **Load world state** restores from a bundle and rebuilds the DM/system prompts (plus party summary if PCs exist).
+- **Refresh Party Summary** reloads PCs from disk and reinjects the summary message for the DM.
+- **Reset Game** clears world/chat/PCs for the current Game ID; use cautiously.
+- **Reset the LLM Model** clears the cached llama-cpp instance if you change model files or settings.
+"""
+)
+
+st.markdown("---")
+
+# -------------------------
 # Tips and fixes
 # -------------------------
 
-st.header("10) Tips and Fixes")
+st.header("12) Tips and Fixes")
 st.markdown(
     """
 - If rolls are missing stats, refresh the party summary so the system links the acting player to a PC sheet.
