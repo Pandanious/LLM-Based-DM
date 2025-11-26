@@ -9,11 +9,15 @@ from src.agent.types import Message
 class GameState:
     world: Optional[World_State] = None
     messages: List[Message] = field(default_factory=list)
+    player_names: List[str] = field(default_factory=list)
     player_characters: Dict[str, PlayerCharacter] = field(default_factory=dict)
     npcs: Dict[str, NPC] = field(default_factory=dict)
     quests: Dict[str, Quest] = field(default_factory=dict)
     initiative_order: List[str] = field(default_factory=list)  # ordered list of pc_ids
     active_turn_index: int = 0  # index into initiative_order
+    active_encounter: Optional[str] = None
+    active_encounter_summary: Optional[str] = None
+    encounter_history: List[str] = field(default_factory=list)
 
 @lru_cache(maxsize=1)
 def get_global_games() -> Dict[str, GameState]:

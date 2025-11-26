@@ -5,6 +5,7 @@ import streamlit as st
 from src.agent.types import Message
 from src.game.game_state import GameState
 from src.game.turn_store import load_turn_log, begin_turn, save_turn_log
+from src.UI.mechanics_prompt import refresh_mechanics_prompt
 
 
 def rebuild_initiative_order(game: GameState) -> None:
@@ -31,8 +32,9 @@ def add_turn_system_message(game: GameState, pc) -> None:
     if not pc:
         return
     turn_line = (
-        f"[TURN] Active character: {pc.name} (player {pc.player_name}). "
-        "Use this character for all actions until the turn advances."
+        f"[TURN] It is now {pc.player_name} playing {pc.name}. "
+        "Use this character for all actions until the turn advances. "
+        "Click Next Turn when done."
     )
     game.messages.append(Message(role="system", content=turn_line))
 
@@ -55,6 +57,23 @@ def render_initiative_controls(game: GameState) -> None:
                     game.turn_log = load_turn_log(game.world.world_id)
                 game.turn_log = begin_turn(game.turn_log, actor)
                 save_turn_log(game.turn_log)
+            refresh_mechanics_prompt(game)
+            # Show a quick UI notice about the active player/character
+            st.info(f"Now acting: {actor.player_name} as {actor.name}")
+            # Re-offer any stored options for this turn
+            if getattr(game, "turn_log", None) and game.turn_log.entries:
+                options = game.turn_log.entries[-1].options
+                if options:
+                    st.caption(f"Actions to use this turn: {', '.join(options)}")
+                    game.messages.append(
+                        Message(
+                            role="system",
+                            content=(
+                                f"[TURN ACTIONS] {actor.player_name} as {actor.name}, "
+                                f"available actions: {', '.join(options)}"
+                            ),
+                        )
+                    )
             st.success(
                 f"Initiative set. First turn: {actor.name} "
                 f"(Initiative {getattr(actor, 'initiative', 0)})."
@@ -73,10 +92,24 @@ def render_initiative_controls(game: GameState) -> None:
                         game.turn_log = load_turn_log(game.world.world_id)
                     game.turn_log = begin_turn(game.turn_log, actor)
                     save_turn_log(game.turn_log)
+                refresh_mechanics_prompt(game)
                 st.info(
-                    f"Next up: {actor.name} "
+                    f"Next up: {actor.player_name} as {actor.name} "
                     f"(Initiative {getattr(actor, 'initiative', 0)})."
                 )
+                if getattr(game, "turn_log", None) and game.turn_log.entries:
+                    options = game.turn_log.entries[-1].options
+                    if options:
+                        st.caption(f"Actions to use this turn: {', '.join(options)}")
+                        game.messages.append(
+                            Message(
+                                role="system",
+                                content=(
+                                    f"[TURN ACTIONS] {actor.player_name} as {actor.name}, "
+                                    f"available actions: {', '.join(options)}"
+                                ),
+                            )
+                        )
 
     if game.initiative_order:
         order_names = [

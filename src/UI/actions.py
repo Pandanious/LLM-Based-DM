@@ -1,5 +1,7 @@
 import streamlit as st
 
+from typing import Optional
+
 from src.agent.persona import DM_SYSTEM_PROMPT_TEMPLATE
 from src.agent.types import Message
 from src.agent.world_build import generate_world_state
@@ -10,8 +12,40 @@ from src.agent.quest_gen import generate_quests_for_world
 from src.game.quest_store import save_quests
 from src.agent.quest_commands import handle_quest_command
 from src.agent.dm_dice import dm_turn_with_dice
-from src.game.turn_store import load_turn_log, add_turn_note, save_turn_log
+from src.game.turn_store import (
+    load_turn_log,
+    add_turn_note,
+    save_turn_log,
+    add_turn_action,
+)
 from src.game.game_state import GameState
+from src.game.models import PlayerCharacter
+from src.agent.encounter_build import detect_encounter, encounter_prompt
+from src.UI.mechanics_prompt import refresh_mechanics_prompt
+from src.UI.initiative import current_actor
+
+
+def _resolve_actor(game: GameState, speaker: str) -> Optional[PlayerCharacter]:
+    """
+    Try to find the PlayerCharacter being referenced by the current speaker label.
+    Speaker may be 'player' or 'player:character'.
+    """
+    if not game.player_characters:
+        return None
+
+    player_name = speaker
+    pc_name = None
+    if ":" in speaker:
+        player_name, pc_name = [part.strip() for part in speaker.split(":", 1)]
+
+    # Prefer explicit character match, then player name match.
+    for pc in game.player_characters.values():
+        if pc_name and pc.name.lower() == pc_name.lower():
+            return pc
+    for pc in game.player_characters.values():
+        if pc.player_name.lower() == player_name.lower():
+            return pc
+    return None
 
 
 def handle_world_creation(user_input: str, game_id: str, game: GameState) -> None:
@@ -69,6 +103,9 @@ def handle_gameplay_input(user_input: str, game: GameState, speaker: str) -> Non
     Handle normal gameplay input when a world and PCs exist.
     Includes /quest commands and dice-enabled DM turns.
     """
+    if game.world is not None and not hasattr(game, "turn_log"):
+        game.turn_log = load_turn_log(game.world.world_id)
+
     # 1) Intercept /quest commands
     if handle_quest_command(user_input, game):
         game.messages.append(
@@ -93,9 +130,47 @@ def handle_gameplay_input(user_input: str, game: GameState, speaker: str) -> Non
             )
 
     # 3) Normal player message
+    refresh_mechanics_prompt(game)
     game.messages.append(
         Message(role="user", content=user_input, speaker=speaker)
     )
+
+    # 3a) Enforce initiative order: block out-of-turn actions
+    if game.initiative_order:
+        expected_actor = current_actor(game)
+        actor = _resolve_actor(game, speaker)
+        if expected_actor and (not actor or expected_actor.pc_id != actor.pc_id):
+            expected_label = f"{expected_actor.player_name} as {expected_actor.name}"
+            game.messages.append(
+                Message(
+                    role="system",
+                    content=(
+                        f"It's not your turn. Active turn: {expected_label}. "
+                        "Click Next Turn when they finish."
+                    ),
+                )
+            )
+            return
+
+    # 3b) Encounter detection
+    encounter = detect_encounter(user_input)
+    actor = _resolve_actor(game, speaker)
+    if encounter and game.active_encounter != encounter.encounter_type:
+        game.active_encounter = encounter.encounter_type
+        game.active_encounter_summary = encounter.summary
+        game.encounter_history.append(encounter.summary)
+        player_name = actor.player_name if actor else speaker
+        char_name = actor.name if actor else "Unknown character"
+        game.messages.append(
+            Message(
+                role="system",
+                content=encounter_prompt(encounter, player_name, char_name),
+            )
+        )
+        if hasattr(game, "turn_log"):
+            note = f"Encounter started: {encounter.encounter_type}"
+            game.turn_log = add_turn_note(game.turn_log, note)
+            save_turn_log(game.turn_log)
 
     # 4) DM turn, with dice support for /action
     with st.spinner("The DM is thinking..."):
@@ -106,4 +181,41 @@ def handle_gameplay_input(user_input: str, game: GameState, speaker: str) -> Non
         if hasattr(game, "turn_log"):
             note = f"{speaker}: {user_input}"
             game.turn_log = add_turn_note(game.turn_log, note)
+            actor = _resolve_actor(game, speaker)
+            tags = ["action"] if user_input.strip().startswith("/action") else None
+            game.turn_log = add_turn_action(
+                game.turn_log,
+                player_name=speaker,
+                actor=actor,
+                content=user_input,
+                tags=tags,
+            )
             save_turn_log(game.turn_log)
+        # Explicitly remind to advance the turn, with both player and character names.
+        actor = _resolve_actor(game, speaker)
+        if actor:
+            reminder = (
+                f"Turn resolved for {actor.player_name} as {actor.name}. "
+                "Click Next Turn to move to the next character."
+            )
+        else:
+            reminder = (
+                f"Turn resolved for {speaker}. "
+                "Click Next Turn to move to the next character."
+            )
+        game.messages.append(Message(role="system", content=reminder))
+        # Suggest who is next in initiative, if available
+        if game.initiative_order:
+            if game.initiative_order:
+                next_idx = (game.active_turn_index + 1) % len(game.initiative_order)
+                next_pc = game.player_characters.get(game.initiative_order[next_idx])
+                if next_pc:
+                    game.messages.append(
+                        Message(
+                            role="system",
+                            content=(
+                                f"Next up: {next_pc.player_name} as {next_pc.name}. "
+                                "Press Next Turn to hand over."
+                            ),
+                        )
+                    )

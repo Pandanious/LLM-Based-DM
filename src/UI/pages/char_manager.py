@@ -25,14 +25,14 @@ def get_game_and_world():
 
 
 def render_character_card(pc) -> None:
-    #Show a character sheet in a collapsible card.
-    with st.expander(f"{pc.name} ({pc.player_name}) – Level {pc.level}"):
+    # Show a character sheet in a collapsible card.
+    with st.expander(f"{pc.name} ({pc.player_name}) - Level {pc.level}"):
         st.markdown(f"**Concept:** {pc.concept}")
         st.markdown(f"**Gender:** {pc.gender}")
         st.markdown(f"**Ancestry:** {pc.ancestry}")
         st.markdown(f"**Archetype:** {pc.archetype}")
         st.markdown(f"**HP:** {pc.current_hp} / {pc.max_hp}")
-        st.markdown(f"**Initiative:** {getattr(pc, 'initiative', '—')}")
+        st.markdown(f"**Initiative:** {getattr(pc, 'initiative', '?')}")
 
 
         st.markdown("**Stats**")
@@ -77,11 +77,12 @@ st.subheader("Local Players at This Browser")
 # Initialize local_player_names from main app's player_names if present
 
 if "local_player_names" not in st.session_state:
-    base = st.session_state.get("player_names", [])
+    # Prefer names set on the main page; fallback to game-stored names; else placeholder
+    base = st.session_state.get("player_names", []) or getattr(game, "player_names", [])
     if base:
         st.session_state.local_player_names = list(base)
     else:
-        st.session_state.local_player_names = [""]
+        st.session_state.local_player_names = ["char1", "char2"]
 
 players_csv = st.text_input(
     "Player names (comma-separated, local to this browser)",
@@ -94,10 +95,20 @@ players_csv = st.text_input(
 
 local_player_names = [p.strip() for p in players_csv.split(",") if p.strip()]
 st.session_state.local_player_names = local_player_names
+st.session_state.player_names = local_player_names
+game.player_names = local_player_names
 
 if not local_player_names:
     st.info("Add at least one player name above to start creating characters.")
     st.stop()
+
+# Character generation queue (FIFO) per game_id
+queue_key = f"char_gen_queue_{game_id}"
+busy_key = f"char_gen_busy_{game_id}"
+if queue_key not in st.session_state:
+    st.session_state[queue_key] = []
+if busy_key not in st.session_state:
+    st.session_state[busy_key] = False
 
 st.markdown("---")
 st.subheader("Create / Re-roll Characters for Local Players")
@@ -156,22 +167,17 @@ for player_name in local_player_names:
             if not concept.strip():
                 st.warning(f"Please describe the character idea for {player_name} first.")
             else:
-                with st.spinner(f"Generating character for {player_name}..."):
-                    pc = generate_character_sheet(
-                        world_summary=world.world_summary,
-                        world_skills=world.skills,
-                        player_name=player_name,
-                        character_prompt=concept,
-                        pc_id=pc_id,
-                        char_name=char_name,
-                        gender=gender,
-                        ancestry=ancestry,
-                    )
-                    game.player_characters[pc_id] = pc
-                    save_player_characters(world.world_id, game.player_characters)
-                    st.success(
-                        f"Character generated for {player_name}: {pc.name}"
-                    )
+                st.session_state[queue_key].append(
+                    {
+                        "player_name": player_name,
+                        "pc_id": pc_id,
+                        "char_name": char_name,
+                        "gender": gender,
+                        "ancestry": ancestry,
+                        "concept": concept,
+                    }
+                )
+                st.success(f"Queued generation for {player_name}.")
 
     with cols[1]:
         if existing_pc:
@@ -191,3 +197,33 @@ if not game.player_characters:
 else:
     for pc_id, pc in game.player_characters.items():
         render_character_card(pc)
+
+st.markdown("---")
+st.subheader("Queued Character Generations (FIFO)")
+
+queue = st.session_state[queue_key]
+if not queue:
+    st.caption("Queue is empty.")
+else:
+    for idx, item in enumerate(queue, start=1):
+        st.caption(f"{idx}. {item['player_name']} \u2192 {item['char_name']} ({item['ancestry']})")
+
+process_disabled = not queue or st.session_state[busy_key]
+if st.button("Process next queued generation", disabled=process_disabled):
+    st.session_state[busy_key] = True
+    job = queue.pop(0)
+    with st.spinner(f"Generating character for {job['player_name']}..."):
+        pc = generate_character_sheet(
+            world_summary=world.world_summary,
+            world_skills=world.skills,
+            player_name=job["player_name"],
+            character_prompt=job["concept"],
+            pc_id=job["pc_id"],
+            char_name=job["char_name"],
+            gender=job["gender"],
+            ancestry=job["ancestry"],
+        )
+        game.player_characters[job["pc_id"]] = pc
+        save_player_characters(world.world_id, game.player_characters)
+        st.success(f"Character generated for {job['player_name']}: {pc.name}")
+    st.session_state[busy_key] = False

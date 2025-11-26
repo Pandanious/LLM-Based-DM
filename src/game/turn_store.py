@@ -10,6 +10,16 @@ from src.game.models import PlayerCharacter
 
 
 @dataclass
+class ActionEntry:
+    actor_id: Optional[str]
+    actor_name: str
+    player_name: str
+    content: str
+    timestamp: str
+    tags: List[str] = field(default_factory=list)
+
+
+@dataclass
 class TurnEntry:
     turn_number: int
     actor_id: Optional[str]
@@ -17,6 +27,7 @@ class TurnEntry:
     timestamp: str
     description: str
     options: List[str] = field(default_factory=list)
+    actions: List[ActionEntry] = field(default_factory=list)
 
 
 @dataclass
@@ -44,6 +55,17 @@ class TurnLog:
                 timestamp=e.get("timestamp", ""),
                 description=e.get("description", ""),
                 options=list(e.get("options", [])),
+                actions=[
+                    ActionEntry(
+                        actor_id=a.get("actor_id"),
+                        actor_name=a.get("actor_name", ""),
+                        player_name=a.get("player_name", ""),
+                        content=a.get("content", ""),
+                        timestamp=a.get("timestamp", ""),
+                        tags=list(a.get("tags", [])),
+                    )
+                    for a in e.get("actions", [])
+                ],
             )
             for e in data.get("entries", [])
         ]
@@ -97,3 +119,86 @@ def add_turn_note(turn_log: TurnLog, note: str, options: Optional[List[str]] = N
     if options:
         entry.options.extend(options)
     return turn_log
+
+
+def add_turn_action(
+    turn_log: TurnLog,
+    *,
+    player_name: str,
+    actor: Optional[PlayerCharacter],
+    content: str,
+    tags: Optional[List[str]] = None,
+) -> TurnLog:
+    """
+    Attach a structured action record to the most recent turn.
+    """
+    if not turn_log.entries:
+        return turn_log
+
+    action = ActionEntry(
+        actor_id=actor.pc_id if actor else None,
+        actor_name=actor.name if actor else "Unknown",
+        player_name=player_name,
+        content=content,
+        timestamp=datetime.utcnow().isoformat(),
+        tags=list(tags or []),
+    )
+    turn_log.entries[-1].actions.append(action)
+    return turn_log
+
+
+def build_action_summary(
+    turn_log: TurnLog,
+    limit: int = 12,
+    encounter_summary: Optional[str] = None,
+    encounter_history: Optional[List[str]] = None,
+) -> str:
+    """
+    Produce a compact human-readable summary of the latest actions,
+    with optional encounter context.
+    """
+    lines: List[str] = []
+    if encounter_summary:
+        lines.append(f"Active encounter: {encounter_summary}")
+    if encounter_history:
+        lines.append("Recent encounters: " + " | ".join(encounter_history[-3:]))
+
+    collected = []
+    for entry in turn_log.entries:
+        for action in entry.actions:
+            collected.append((entry.turn_number, action))
+
+    if not collected:
+        base = "No actions recorded yet."
+        return "\n".join(lines + [base]) if lines else base
+
+    tail = collected[-limit:]
+    lines.append("Recent actions (oldest of the batch first):")
+    for turn_number, action in tail:
+        try:
+            ts = datetime.fromisoformat(action.timestamp).strftime("%H:%M")
+        except Exception:
+            ts = action.timestamp
+        lines.append(
+            f"- Turn {turn_number}: {action.player_name}/{action.actor_name}: "
+            f"{action.content} (at {ts}Z)"
+        )
+    return "\n".join(lines)
+
+
+def export_turn_log_snapshot(turn_log: TurnLog, summary_text: Optional[str] = None) -> tuple[Path, Path]:
+    """
+    Persist the turn log plus a text summary into a timestamped snapshot folder.
+    """
+    timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    export_root = Path("saves") / "snapshots" / f"{turn_log.world_id}_actions"
+    export_root.mkdir(parents=True, exist_ok=True)
+
+    json_path = export_root / f"{turn_log.world_id}_turns_{timestamp}.json"
+    summary_path = export_root / f"{turn_log.world_id}_summary_{timestamp}.txt"
+
+    json_path.write_text(json.dumps(turn_log.to_dict(), indent=2), encoding="utf-8")
+    summary_text = summary_text if summary_text is not None else build_action_summary(turn_log)
+    summary_path.write_text(summary_text, encoding="utf-8")
+
+    return json_path, summary_path

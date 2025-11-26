@@ -9,6 +9,13 @@ from src.game.dice import roll_dice
 
 
 END_MARKER = "<<CHARACTER_SHEET_COMPLETE>>"
+STOP_MARKERS = [
+    END_MARKER.lower(),
+    "character sheet complete",
+    "character sheet completed",
+    "end:",
+    "end of character sheet",
+]
 
 
 CHAR_GEN_PROMPT_TEMPLATE = dedent(f"""
@@ -152,12 +159,33 @@ def _parse_list_block(block: str) -> List[str]:
             line = line[1:].strip()
         if not line:
             continue
-        # de-duplicate list entries
-        lower = line.lower()
-        if lower in seen:
+        lower_line = line.lower()
+        # Skip obvious header/marker pollution and model self-talk
+        if lower_line.startswith(
+            (
+                "name:",
+                "gender:",
+                "ancestry:",
+                "archetype:",
+                "level:",
+                "concept:",
+                "stats:",
+                "skills:",
+                "inventory:",
+                "end:",
+            )
+        ):
             continue
-        seen.add(lower)
+        if "character sheet" in lower_line or "complete" in lower_line:
+            continue
+        # de-duplicate list entries
+        if lower_line in seen:
+            continue
+        seen.add(lower_line)
         items.append(line)
+        # Hard cap to avoid runaway lists
+        if len(items) >= 6:
+            break
     return items
 
 
@@ -199,6 +227,14 @@ def _clean_raw_text(raw: str) -> str:
     # Remove fenced code blocks or backtick wrappers the model might emit
     text = re.sub(r"^```(?:\w+)?\\n?", "", text)
     text = re.sub(r"```$", "", text)
+    # Truncate at the first stop marker we see
+    lower_text = text.lower()
+    for marker in STOP_MARKERS:
+        idx = lower_text.find(marker)
+        if idx != -1:
+            text = text[:idx]
+            lower_text = text.lower()
+            break
     # Drop any END markers in various forms
     text = text.replace(f"END: {END_MARKER}", "")
     text = text.replace(END_MARKER, "")

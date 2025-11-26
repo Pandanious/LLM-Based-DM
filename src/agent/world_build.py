@@ -35,9 +35,9 @@ Include:
 - current tensions that adventurers might encounter
 
 ========================================
-MAJOR LOCATIONS (3):
+MAJOR LOCATIONS (1):
 ========================================
-List exactly THREE major exploration hubs.
+List exactly ONE major exploration hubs.
 For each:
 - NAME (1–3 words)
 - 2–4 sentences describing purpose, atmosphere, and important features.
@@ -46,9 +46,9 @@ Format example:
 1. NAME — description...
 
 ========================================
-MINOR LOCATIONS (5):
+MINOR LOCATIONS (2):
 ========================================
-List exactly FIVE smaller adventuring or quest-oriented locations.
+List exactly TWO smaller adventuring or quest-oriented locations.
 For each:
 - NAME
 - 1–3 sentences describing its danger, mystery, or purpose.

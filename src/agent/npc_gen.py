@@ -286,9 +286,8 @@ def generate_npcs_for_world(world: World_State, max_npcs: int = 10) -> Dict[str,
     minor_locations_str = _format_locations(world.minor_locations)
     players_str = ", ".join(world.players) if world.players else "Unknown players"
 
-    # We treat max_npcs as a soft upper bound. The LLM is asked for at least
-    # min_npcs_base, and we may add more during role enforcement.
-    min_npcs_base = max_npcs  # you can change this if you want room for padding
+    # Ask the LLM for up to max_npcs. We won't pad with generic extras.
+    min_npcs_base = 0  # disable filler NPC padding
 
     prompt = NPC_GEN_PROMPT_TEMPLATE.format(
         world_summary=world.world_summary,
@@ -346,9 +345,6 @@ def generate_npcs_for_world(world: World_State, max_npcs: int = 10) -> Dict[str,
             created_on=now,
             last_updated=now,
         )
-
-    # Enforce minimum base NPC count
-    _ensure_minimum_npcs(world, npcs, min_npcs_base)
 
     # Enforce per-minor-location role coverage
     _ensure_roles_per_minor_location(world, npcs)

@@ -32,10 +32,11 @@ def render_sidebar(
 
         game = get_or_create_game(games, game_id)
 
-        world_url = f"http://localhost:8501/world_info?game_id={game_id}"
-        char_url = f"http://localhost:8501/char_manager?game_id={game_id}"
-        quest_url = f"http://localhost:8501/quest_log?game_id={game_id}"
-        npc_url = f"http://localhost:8501/npc_log?game_id={game_id}"
+        world_url = f"/world_info?game_id={game_id}"
+        char_url = f"/char_manager?game_id={game_id}"
+        quest_url = f"/quest_log?game_id={game_id}"
+        npc_url = f"/npc_log?game_id={game_id}"
+
 
         st.markdown(f"**Current Game ID:** `{game_id}`")
 
@@ -44,7 +45,8 @@ def render_sidebar(
         # Local player names
         players_raw = st.text_input(
             "Player names (comma-separated, local only)",
-            value="Alice, Bob",
+            placeholder="char1, char2",
+            
         )
 
         startbutton = st.button("Reset Game (this ID)", type="primary")

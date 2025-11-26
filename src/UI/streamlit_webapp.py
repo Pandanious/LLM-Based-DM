@@ -16,6 +16,7 @@ from src.agent.types import Message
 
 from src.agent.party_summary import build_party_summary
 from src.game.party_store import save_party_summary
+from src.game.turn_store import build_action_summary, export_turn_log_snapshot
 
 
 # ---------------------------------------
@@ -49,6 +50,7 @@ game, game_id, players_raw, startbutton, initiative_sidebar = render_sidebar(gam
 # Parse local player names
 player_names = [p.strip() for p in players_raw.split(",") if p.strip()]
 st.session_state.player_names = player_names
+game.player_names = player_names
 
 # Reset game if requested
 if startbutton:
@@ -69,6 +71,13 @@ else:
     chat_prompt = "Play your turn. Use /action for mechanics."
 
 user_input = st.chat_input(chat_prompt)
+speaker_label = st.session_state.get("current_speaker")
+default_speaker = (
+    st.session_state.player_names[0]
+    if st.session_state.player_names
+    else "Player"
+)
+speaker = speaker_label or default_speaker
 
 
 # World creation
@@ -78,11 +87,6 @@ if user_input and not world_exists:
 
 # Gameplay input
 if user_input and world_exists and pcs_exist:
-    speaker = (
-        st.session_state.player_names[0]
-        if st.session_state.player_names
-        else "Player"
-    )
     handle_gameplay_input(user_input, game, speaker)
 
 
@@ -115,6 +119,34 @@ if world_exists and pcs_exist:
 
 with initiative_sidebar:
     render_initiative_controls(game)
+
+# ---------------------------------------
+# ENCOUNTER STATUS
+# ---------------------------------------
+
+if getattr(game, "active_encounter", None):
+    st.warning(
+        f"Active encounter: {game.active_encounter} | "
+        f"{getattr(game, 'active_encounter_summary', '')}"
+    )
+
+
+# ---------------------------------------
+# ACTION RECAP EXPORT
+# ---------------------------------------
+
+if game.world is not None and hasattr(game, "turn_log") and getattr(game.turn_log, "entries", None):
+    if st.button("Export action recap"):
+        summary_text = build_action_summary(
+            game.turn_log,
+            limit=25,
+            encounter_summary=getattr(game, "active_encounter_summary", None),
+            encounter_history=getattr(game, "encounter_history", None),
+        )
+        json_path, summary_path = export_turn_log_snapshot(game.turn_log, summary_text)
+        st.success(
+            f"Action recap saved to `{json_path}` and `{summary_path}`"
+        )
 
 
 # ---------------------------------------
