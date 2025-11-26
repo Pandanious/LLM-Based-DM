@@ -1,0 +1,80 @@
+import sys
+from pathlib import Path
+
+import streamlit as st
+
+# --- Make src importable ---
+ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.append(str(ROOT))
+
+from src.game.game_state import get_global_games
+
+
+def get_game_and_world():
+    query_params = st.query_params
+    game_id = query_params.get("game_id", "default")
+
+    games = get_global_games()
+    game = games.get(game_id)
+
+    if not game:
+        return None, None, game_id
+
+    world = game.world
+    return game, world, game_id
+
+
+st.set_page_config(page_title="NPC Overview", layout="wide")
+st.title("NPC Overview")
+
+game, world, game_id = get_game_and_world()
+
+st.markdown(f"**Game ID:** `{game_id}`")
+st.markdown("---")
+
+if world is None:
+    st.warning("No world found for this Game ID yet.")
+    st.stop()
+
+st.markdown(f"**World:** **{world.title}**")
+st.markdown(world.world_summary)
+st.markdown("---")
+
+npc_dict = getattr(game, "npcs", {}) or {}
+npc_count = len(npc_dict)
+
+st.subheader(f"NPCs in this world ({npc_count})")
+
+if npc_count == 0:
+    st.info("No NPCs generated yet for this world.")
+    st.stop()
+
+# Group by location
+npcs_by_location = {}
+for npc_id, npc in npc_dict.items():
+    loc = getattr(npc, "location", "Unknown location")
+    npcs_by_location.setdefault(loc, []).append(npc)
+
+for location in sorted(npcs_by_location.keys()):
+    npcs_here = npcs_by_location[location]
+    with st.expander(f"{location} ({len(npcs_here)} NPCs)", expanded=False):
+        for npc in npcs_here:
+            name = getattr(npc, "name", "Unnamed NPC")
+            role = getattr(npc, "role", "Unknown role")
+            desc = getattr(npc, "description", "")
+
+            # Optional tiny highlights for merchant / leader / quest giver
+            role_lower = str(role).lower()
+            highlight = ""
+            if "merchant" in role_lower:
+                highlight = " 🛒"
+            elif "leader" in role_lower:
+                highlight = " 🏰"
+            elif "quest" in role_lower:
+                highlight = " 🗺️"
+
+            st.markdown(f"**{name}** — {role}{highlight}")
+            if desc:
+                st.markdown(f"> {desc}")
+            st.markdown("---")

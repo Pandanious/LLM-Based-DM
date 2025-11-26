@@ -143,7 +143,7 @@ class NPC:
     role: str
     location: str
 
-    desc: str
+    description: str
     hooks: List[str] = field(default_factory=list)
     attitude: str = "neutral"
     tags: List[str] = field(default_factory=list)
@@ -181,7 +181,7 @@ class NPC:
             name=data["name"],
             role=data.get("role", ""),
             location=data.get("location", ""),
-            description=data.get("description", ""),
+            description=data.get("description", data.get("desc", "")),
             hooks=list(data.get("hooks", [])),
             attitude=data.get("attitude", "neutral"),
             tags=list(data.get("tags", [])),
@@ -189,4 +189,61 @@ class NPC:
             last_updated=last_updated,
         )
     
-    
+@dataclass
+class Quest:
+    quest_id: str
+    world_id: str
+
+    title: str
+    summary: str
+
+    giver_npc_id: Optional[str] = None
+    giver_name: Optional[str] = None
+    target_location: Optional[str] = None
+
+    steps: List[str] = field(default_factory=list)
+    rewards: List[str] = field(default_factory=list)
+
+    status: str = "available"  # "available", "in_progress", "completed", "failed"
+
+    created_on: datetime = field(default_factory=datetime.utcnow)
+    last_updated: Optional[datetime] = None
+
+    def to_dict(self) -> dict:
+        data = asdict(self)
+        if isinstance(self.created_on, datetime):
+            data["created_on"] = self.created_on.isoformat()
+        if isinstance(self.last_updated, datetime):
+            data["last_updated"] = self.last_updated.isoformat()
+        return data
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "Quest":
+        created_raw = data.get("created_on")
+        updated_raw = data.get("last_updated")
+
+        created_on = (
+            datetime.fromisoformat(created_raw)
+            if isinstance(created_raw, str)
+            else datetime.utcnow()
+        )
+        last_updated = (
+            datetime.fromisoformat(updated_raw)
+            if isinstance(updated_raw, str)
+            else None
+        )
+
+        return cls(
+            quest_id=data["quest_id"],
+            world_id=data["world_id"],
+            title=data.get("title", ""),
+            summary=data.get("summary", ""),
+            giver_npc_id=data.get("giver_npc_id"),
+            giver_name=data.get("giver_name"),
+            target_location=data.get("target_location"),
+            steps=list(data.get("steps", [])),
+            rewards=list(data.get("rewards", [])),
+            status=data.get("status", "available"),
+            created_on=created_on,
+            last_updated=last_updated,
+        )

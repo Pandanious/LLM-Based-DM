@@ -1,8 +1,8 @@
 import streamlit as st
-from urllib.parse import urlparse, parse_qs
 
 from src.game.game_state import get_global_games
 from src.game.npc_store import load_npcs
+
 
 def get_world_from_query():
     """Extract ?game_id=XYZ and fetch world data."""
@@ -54,7 +54,7 @@ st.subheader("World Lore")
 st.write(world.lore)
 
 
-### NPC ADDITION
+# NPC overview
 
 st.markdown("---")
 st.subheader("NPCs in this World")
@@ -73,7 +73,7 @@ else:
                 st.markdown("**Tags:** " + ", ".join(npc.tags))
 
             st.markdown("**Description:**")
-            st.write(npc.desc)
+            st.write(npc.description)
 
             if npc.hooks:
                 st.markdown("**Hooks:**")

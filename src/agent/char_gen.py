@@ -118,9 +118,7 @@ def generate_character_sheet(
         repeat_penalty=1.2,  # slightly stronger to reduce rambling
     )
 
-    raw = result["choices"][0]["text"].strip()
-    raw = raw.replace(f"END: {END_MARKER}", "").strip()
-    raw = raw.replace("END: ", "").strip()
+    raw = _clean_raw_text(result["choices"][0]["text"])
 
     return _parse_character_text(
         raw_text=raw,
@@ -196,6 +194,19 @@ def _dedupe_sentences(text: str, max_sentences: int = 4) -> str:
     return " ".join(cleaned).strip()
 
 
+def _clean_raw_text(raw: str) -> str:
+    text = raw.strip()
+    # Remove fenced code blocks or backtick wrappers the model might emit
+    text = re.sub(r"^```(?:\w+)?\\n?", "", text)
+    text = re.sub(r"```$", "", text)
+    # Drop any END markers in various forms
+    text = text.replace(f"END: {END_MARKER}", "")
+    text = text.replace(END_MARKER, "")
+    text = text.replace("END:", "")
+    # Remove a leading “Character Sheet” label if present
+    text = re.sub(r"^Character Sheet:?\\s*", "", text, flags=re.IGNORECASE)
+    return text.strip()
+
 def _parse_character_text(
     raw_text: str,
     pc_id: str,
@@ -269,10 +280,11 @@ def _parse_character_text(
         last_updated=now,    )
 
     try:
-        init_result = roll_dice("1d20", reason="Initial initiative")
+        # roll_dice only expects an expression; use a simple d20 for initiative
+        init_result = roll_dice("1d20")
         pc.initiative = init_result.total
     except Exception:
-        # Fallback so we never crash char generation
+        # Fallback so we never crash character generation
         pc.initiative = 0
 
     return pc

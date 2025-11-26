@@ -1,16 +1,14 @@
-#PLACEHOLDER - AI GEN BASED ON REPO - NOT FINAL
-
 import sys
 from pathlib import Path
 
 import streamlit as st
 
-# --- Make src importable ---
+# Make src importable when Streamlit runs this page directly
 ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))
 
-from src.game.game_state import get_global_games  # optional, for world/game info
+from src.game.game_state import get_global_games
 
 
 def get_game_and_world():
@@ -20,249 +18,193 @@ def get_game_and_world():
     games = get_global_games()
     game = games.get(game_id)
 
-    if not game or game.world is None:
+    if not game:
         return None, None, game_id
 
     return game, game.world, game_id
 
 
-st.set_page_config(page_title="How to Play – Local DM", layout="wide")
+st.set_page_config(page_title="How to Play / Local DM", layout="wide")
 st.title("How to Play / Help")
 
 game, world, game_id = get_game_and_world()
-
 st.markdown(f"**Game ID:** `{game_id}`")
 
-if world is not None:
+if world:
     st.markdown(f"**Current World:** **{world.title}**")
     st.markdown(world.world_summary)
 else:
-    st.info(
-        "No active world detected for this Game ID yet. "
-        "You can still read the instructions below."
-    )
+    st.info("No active world detected for this Game ID yet. You can still read the instructions below.")
 
 st.markdown("---")
 
-# =========================
-# Section: Overall Flow
-# =========================
+# -------------------------
+# Quick start
+# -------------------------
 
-st.header("1. Overall Game Flow")
-
+st.header("1) Quick Start")
 st.markdown(
     """
-1. **Start / Reset Game**
-   - In the main app, enter a **Game ID** in the sidebar.
-   - Click **Start/Reset Game** to clear world, chat, and characters for that Game ID.
-
-2. **Create a World**
-   - In the main app chat, the DM first asks you to **describe the world or setting**.
-   - Write a short description (genre, tone, themes), then the system generates:
-     - a world title,
-     - world summary and lore,
-     - major & minor locations,
-     - and a set of NPCs.
-
-3. **Create Player Characters**
-   - Open the **Character Manager** (button on the right of the main app).
-   - For each player name:
-     - choose character name, gender, ancestry,
-     - write a short concept,
-     - click **Generate / Re-roll**.
-   - The system uses the LLM to produce a **character sheet** and saves it.
-
-4. **Start Playing**
-   - Return to the main app.
-   - If needed, use **Refresh Party Summary** so the DM sees the latest characters.
-   - Type **“start”** to begin the adventure using the existing party.
-   - From then on, you play by typing normal text (in-character) and special `/action` commands.
+1. In the main app sidebar, enter a **Game ID** (everyone who uses the same ID shares the table) and click **Reset Game** if you want a clean slate.
+2. In the chat box, describe the **setting** you want. The app forges a titled world, lore, locations, NPC roster, and saves it under `saves/<game_id>.json`.
+3. Open **Character Manager** to create a sheet for each local player (name, ancestry, concept). Sheets are saved to `saves/<game_id>_players.json`.
+4. Return to the main page, click **Refresh Party Summary** if needed, then play by chatting in-character and using `/action ...` when you want mechanics.
 """
 )
 
 st.markdown("---")
 
-# =========================
-# Section: Commands
-# =========================
+# -------------------------
+# Pages and controls
+# -------------------------
 
-st.header("2. Commands and Actions")
-
-st.subheader("2.1 Normal in-character messages")
-
+st.header("2) Pages and Controls")
 st.markdown(
     """
-- Just type what your character does or says:
-
-  - `I lean on the bar and ask the bartender about work.`
-  - `I tell the gang leader we want safe passage.`
-
-- The DM responds with narration and may suggest options **only when you have not clearly chosen an action**.
-"""
-)
-
-st.subheader("2.2 Mechanical actions: `/action ...`")
-
-st.markdown(
-    """
-To trigger **dice mechanics**, use the `/action` command:
-
-- `/action I try to sneak past the guard`
-- `/action I pick the lock on the door`
-- `/action I shoot at the drone`
-- `/action I search the room carefully`
-
-The system interprets your `/action` and maps it to one of several **standard action types** (used for stats and skills):
-
-- `attack` – basic attacks and strikes  
-- `stealth_check` – sneaking, hiding, avoiding detection  
-- `perception_check` – noticing details, sounds, danger  
-- `lockpick` – opening locks, bypassing mechanisms  
-- `persuasion` – convincing, calming, negotiating  
-- `athletics` – climbing, jumping, pushing, breaking  
-- `acrobatics` – balancing, agile movement, dodging  
-- `damage_light` – light weapon damage (dagger, quick shots)  
-- `damage_heavy` – heavy weapon damage (big swings, powerful hits)
-
-You can also type shortcuts like:
-
-- `/sneak past the guard`
-- `/perception check the door`
-- `/shoot the drone`
-
-These are automatically normalized to a canonical `/action ...` form by the system, so the DM will treat them as mechanical actions.
-"""
-)
-
-st.subheader("2.3 Out-of-character or meta commands")
-
-st.markdown(
-    """
-Some slash commands are reserved for **meta / system use** (not dice):
-
-- `/ooc ...` – out-of-character comments.
-- `/help` – you can ask for in-game help or clarification.
-- These do not trigger dice directly.
+- **Main page (Game Log):** chat with the DM, see history, and manage the table from the sidebar.
+- **Sidebar controls:** set **Game ID**, **Reset Game** (clears world/chat/PCs for that ID), and **Reset the LLM Model** if you change model config.
+- **World Information:** read-only world summary, lore, locations, and NPCs.
+- **Character Manager:** generate or re-roll player characters tied to this Game ID.
+- **Quest Log:** read-only list of generated quests and their status.
+- **NPC Overview:** grouped list of NPCs by location.
+- **Initiative Order controls:** build the turn order from PC initiatives and advance to the next turn.
+- **This Help:** opens in a new tab from the sidebar button.
 """
 )
 
 st.markdown("---")
 
-# =========================
-# Section: Dice and Checks
-# =========================
+# -------------------------
+# World building
+# -------------------------
 
-st.header("3. Dice, Stats, and Success / Failure")
-
+st.header("3) Building the World")
 st.markdown(
     """
-### 3.1 How dice rolls work
-
-1. You declare an action with `/action ...` (or shortcut).
-2. The DM may respond with a special line:
-
-   `\[ROLL_REQUEST: 1d20+2 | stealth_check: sneak past the guard]`
-
-   This means: the DM wants a **stealth check** to resolve your action.
-
-3. The **game system** (not the DM) then:
-   - looks up your character from the current **party**,
-   - uses your **stats** (STR, DEX, CON, INT, WIS, CHA),
-   - checks your **skills** (e.g. stealth, perception),
-   - considers simple difficulty cues in the reason text (“easy”, “hard”, etc.),
-   - builds a final dice expression like `1d20+3` or `1d20-1`,
-   - rolls it and computes **total**, **DC**, and **outcome** (success/failure).
-
-4. The game adds a system line:
-
-   `\[ROLL_RESULT: 1d20+3 = 17 (rolls=[14], modifier=3, action_type=stealth_check, dc=13, outcome=success, actor=Your PC Name) | stealth_check: sneak past the guard]`
-
-5. The DM then sees this and narrates the outcome based on the result.
-"""
-)
-
-st.markdown(
-    """
-### 3.2 Modifiers and difficulty
-
-- Modifiers come from:
-  - your relevant **ability score** (e.g. DEX for stealth),
-  - any matching **skills** (for a small proficiency bonus),
-  - simple difficulty hints in the DM’s reason text:
-    - “easy / simple” → easier DC / bonus
-    - “hard / difficult / risky” → harder DC / penalty
-    - “very hard / extremely” → very high DC / strong penalty
-
-- Checks use a d20:
-  - `1d20 + modifiers` vs. a target DC.
-  - Outcome is recorded as **success** or **failure** in the roll result.
-
-- Damage actions:
-  - `damage_light` → typically a small die (e.g. `1d6 + mod`)
-  - `damage_heavy` → larger die (e.g. `1d10 + mod`)
+- The very first chat message you send (when no world exists) should describe the desired setting, tone, or themes.
+- The app creates:
+  - a world title and summary,
+  - lore plus major/minor locations,
+  - an NPC roster placed at locations,
+  - a starter set of quests tied to those NPCs and places.
+- All of this is shared across tabs that use the same **Game ID**.
 """
 )
 
 st.markdown("---")
 
-# =========================
-# Section: Pages & Buttons
-# =========================
+# -------------------------
+# Characters and party summary
+# -------------------------
 
-st.header("4. Pages and Buttons in the UI")
-
+st.header("4) Characters and Party Summary")
 st.markdown(
     """
-### 4.1 Main page (Game Log)
-
-- **Game ID** (sidebar): all players who use the same ID share the same world.
-- **Start/Reset Game**:
-  - Clears world, messages, and characters for that Game ID.
-- **Reset the LLM Model**:
-  - Reloads the underlying language model with fresh settings.
-- **Game Log**:
-  - Shows all player and DM messages.
-  - This is where you type to actually play.
-
-### 4.2 Right column buttons
-
-- **Open World Information**:
-  - Opens a page showing world summary, lore, locations, and NPCs.
-- **Open Character Manager**:
-  - Opens the page to create / edit characters.
-
-- **Refresh Party Summary** (if you added this button):
-  - Re-loads characters from disk for the current world.
-  - Rebuilds the PARTY SUMMARY system message so the DM sees the latest party.
-  - Also saves the summary to a text file for debugging (if implemented).
-
-### 4.3 This page (How to Play / Help)
-
-- Accessible via the **“How to Play / Help”** button in the main sidebar.
-- Explains:
-  - the game flow,
-  - commands and actions,
-  - how dice and stats work,
-  - what each button and page is for.
+- Use **Character Manager** for each player name you enter (local to your browser) to generate a sheet.
+- Sheets include stats, skills, inventory, and are saved per world so they reload automatically.
+- Back on the main page, **Refresh Party Summary** pulls characters from disk and injects a `PARTY SUMMARY` system message so the DM respects existing PCs.
+- If the DM seems to forget your PC, refresh the summary and continue; do not recreate the character manually.
 """
 )
 
 st.markdown("---")
 
-st.header("5. Tips")
+# -------------------------
+# Playing in chat
+# -------------------------
 
+st.header("5) Playing in Chat")
 st.markdown(
     """
-- If the DM ever seems to **ignore your character sheet** or invent a new one:
-  - Make sure your characters were generated in the Character Manager.
-  - Use **Refresh Party Summary** so the DM sees the correct party.
-  - Then type **“start”** to begin, and the DM should introduce your existing PCs.
+- Normal messages are treated as in-character narration or dialogue.
+- Saying `start` or `let's begin` after PCs exist prompts the DM to introduce the party from the current summary.
+- Keep using the same **Game ID** to resume a table later; the world, PCs, NPCs, and quests load automatically.
+"""
+)
 
-- If dice rolls don’t trigger:
-  - Make sure your command starts with `/action` or a supported shortcut like
-    `/sneak`, `/perception`, `/shoot`. The system normalizes these.
+st.markdown("---")
 
-- If something feels off, you can always describe your intent in plain text.
-  The system is designed to keep the rules light and story-focused.
+# -------------------------
+# Initiative / turn order
+# -------------------------
+
+st.header("6) Initiative and Turn Order")
+st.markdown(
+    """
+- PCs have an `initiative` value on their sheet.
+- In the main page right column, use **Build Initiative Order** to sort PCs by initiative and set the first turn.
+- Use **Next Turn** to advance to the next PC in the order; the current actor is shown above the Game Log.
+- No auto re-roll is provided; update initiatives on the sheets if you need to change them, then rebuild the order.
+"""
+)
+
+st.markdown("---")
+
+# -------------------------
+# Dice, actions, and rolls
+# -------------------------
+
+st.header("7) Dice, Actions, and Rolls")
+st.markdown(
+    """
+- Use `/action <what you attempt>` when you want mechanics:
+  - `/action I try to sneak past the guard`
+  - `/action I pick the lock on the chest`
+  - `/action I strike the bandit with my axe`
+- The DM will reply with a line like `[ROLL_REQUEST: 1d20+2 | stealth_check: sneaking past the guard]`.
+- The game system (not the DM) rolls using your stats/skills and difficulty cues, then posts `[ROLL_RESULT: ... outcome=success|failure ...]`.
+- The DM then narrates the outcome based on that result. You do not need to roll manually.
+- Standard action types the system expects:
+  - `attack`, `stealth_check`, `perception_check`, `lockpick`, `persuasion`, `athletics`, `acrobatics`, `damage_light`, `damage_heavy`.
+"""
+)
+
+st.markdown("---")
+
+# -------------------------
+# Quests
+# -------------------------
+
+st.header("8) Quests")
+st.markdown(
+    """
+- Quests are generated alongside the world and saved to `saves/<game_id>_quests.json`.
+- In chat you can manage status without bothering the DM:
+  - `/quest list` - show all quests for this world.
+  - `/quest start <title fragment>` - mark one in progress.
+  - `/quest complete <title fragment>` - mark finished.
+  - `/quest fail <title fragment>` - mark failed.
+- The **Quest Log** page shows all quests, their steps, rewards, and current status.
+"""
+)
+
+st.markdown("---")
+
+# -------------------------
+# NPCs and world reference
+# -------------------------
+
+st.header("9) World Reference")
+st.markdown(
+    """
+- **World Information** shows the generated lore, themes, and major/minor locations.
+- **NPC Overview** lists NPCs by location with roles, tags, and hooks when available.
+- These pages are read-only; they follow the same **Game ID** in the query string.
+"""
+)
+
+st.markdown("---")
+
+# -------------------------
+# Tips and fixes
+# -------------------------
+
+st.header("10) Tips and Fixes")
+st.markdown(
+    """
+- If rolls are missing stats, refresh the party summary so the system links the acting player to a PC sheet.
+- If nothing responds, confirm you are using the correct **Game ID** in every tab.
+- Use **Reset Game** only when you truly want to wipe world/chat/PCs for that ID.
+- You can leave out-of-character notes with plain text; only `/action` and `/quest ...` have special handling right now.
 """
 )
