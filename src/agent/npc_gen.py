@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import re
 import uuid
@@ -9,6 +9,7 @@ from typing import Dict, List, Optional
 
 from src.llm_client import get_llm
 from src.game.models import World_State, NPC
+from src.agent.item_gen import generate_items_for_character
 
 
 NPC_GEN_PROMPT_TEMPLATE = dedent("""
@@ -51,7 +52,7 @@ NPC 1:
 Name: <short unique name>
 Role: <short role label, e.g. "merchant", "gang leader", "quest giver", "bartender">
 Location: <one of the locations listed above (major or minor)>
-Description: <2–4 sentences of flavor>
+Description: <2-4 sentences of flavor>
 Hooks:
 - <one hook sentence>
 - <optional second hook>
@@ -116,7 +117,7 @@ def _parse_field(pattern: str, text: str) -> str:
 
 def _parse_list_block(label: str, text: str) -> List[str]:
     """
-    Extract a bullet list under a label like 'Hooks:' or 'Tags:'.
+    Extract a bullet list under a label like 'Hooks:' or 'Tags:' with minimal normalization.
     """
     pattern = rf"{label}:\s*(.+?)(?:\n\w+:|\Z)"
     m = re.search(pattern, text, re.IGNORECASE | re.DOTALL)
@@ -124,20 +125,14 @@ def _parse_list_block(label: str, text: str) -> List[str]:
         return []
     block = m.group(1)
     items: List[str] = []
-    seen = set()
     for raw_line in block.splitlines():
         line = raw_line.strip()
         if not line:
             continue
-        if line.startswith("-") or line.startswith("•"):
+        if line.startswith("-"):
             line = line[1:].strip()
-        if not line:
-            continue
-        lower = line.lower()
-        if lower in seen:
-            continue
-        seen.add(lower)
-        items.append(line)
+        if line:
+            items.append(line)
     return items
 
 
@@ -170,6 +165,27 @@ def _pick_location_name(world: World_State, preferred: Optional[str]) -> str:
         return random.choice(all_names)
 
     return preferred or "Unknown location"
+
+
+def _label_item(item) -> str:
+    """
+    Build a readable label for an Item without depending on full Item type here.
+    """
+    name = getattr(item, "item_name", "Item")
+    category = getattr(item, "item_category", "") or "gear"
+    sub = getattr(item, "item_subcategory", "")
+    damage = getattr(item, "item_dice_damage", "")
+    damage_type = getattr(item, "item_damage_type", "")
+    parts = [name, f"({category}"]
+    if sub:
+        parts[-1] += f"/{sub}"
+    parts[-1] += ")"
+    if damage and damage != "-":
+        dmg_part = f" dmg {damage}"
+        if damage_type:
+            dmg_part += f" ({damage_type})"
+        parts.append(dmg_part)
+    return " ".join(parts)
 
 
 def _ensure_minimum_npcs(
@@ -332,7 +348,7 @@ def generate_npcs_for_world(world: World_State, max_npcs: int = 10) -> Dict[str,
         npc_id = f"{world.world_id}_npc_{i}"
         now = datetime.utcnow()
 
-        npcs[npc_id] = NPC(
+        npc_obj = NPC(
             npc_id=npc_id,
             world_id=world.world_id,
             name=name,
@@ -345,6 +361,20 @@ def generate_npcs_for_world(world: World_State, max_npcs: int = 10) -> Dict[str,
             created_on=now,
             last_updated=now,
         )
+        # If this looks like a merchant, generate a small inventory
+        role_text = f"{role} {' '.join(tags)}".lower()
+        if any(word in role_text for word in ["merchant", "trader", "vendor", "shopkeeper"]):
+            try:
+                items = generate_items_for_character(
+                    world_summary=world.world_summary,
+                    archetype="merchant_stock",
+                    count=4,
+                )
+                npc_obj.inventory = [_label_item(it) for it in items]
+            except Exception:
+                npc_obj.inventory = []
+
+        npcs[npc_id] = npc_obj
 
     # Enforce per-minor-location role coverage
     _ensure_roles_per_minor_location(world, npcs)

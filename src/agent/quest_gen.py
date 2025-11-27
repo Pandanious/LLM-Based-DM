@@ -10,6 +10,7 @@ from typing import Dict, List, Optional
 
 from src.llm_client import get_llm
 from src.game.models import World_State, NPC, Quest
+from src.agent.item_gen import generate_items_for_character
 
 QUEST_GEN_PROMPT_TEMPLATE = dedent("""
 You are an expert tabletop RPG quest designer.
@@ -235,6 +236,36 @@ def generate_quests_for_world(
 
         steps = _parse_list_block("Steps", chunk)
         rewards = _parse_list_block("Rewards", chunk)
+        reward_items: List[str] = []
+
+        # Try to generate item rewards to accompany textual rewards
+        try:
+            desired = len(rewards) if rewards else 2
+            desired = max(1, min(desired, 4))
+            items = generate_items_for_character(
+                world_summary=world.world_summary,
+                archetype="quest_reward",
+                count=desired,
+            )
+            for it in items:
+                label_parts = [it.item_name or "Item"]
+                cat = it.item_category or ""
+                sub = it.item_subcategory or ""
+                if cat:
+                    cat_text = cat
+                    if sub:
+                        cat_text += f"/{sub}"
+                    label_parts.append(f"({cat_text})")
+                dmg = it.item_dice_damage or ""
+                if dmg and dmg != "-":
+                    dt = it.item_damage_type or ""
+                    dmg_text = f"dmg {dmg}"
+                    if dt:
+                        dmg_text += f" ({dt})"
+                    label_parts.append(dmg_text)
+                reward_items.append(" ".join(label_parts))
+        except Exception:
+            reward_items = []
 
         if not title:
             continue  # skip malformed
@@ -255,6 +286,7 @@ def generate_quests_for_world(
             target_location=resolved_location,
             steps=steps,
             rewards=rewards,
+            reward_items=reward_items,
             status="available",
             created_on=now,
             last_updated=now,

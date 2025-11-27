@@ -10,12 +10,10 @@ from src.game.models import World_State
 WORLD_GEN_PROMPT_TEMPLATE = dedent("""
 You are an expert tabletop RPG worldbuilder. Expand the user's idea into a fully-realized campaign world.
 
-Write your answer in plain text with the following sections, in this exact order:
+Start with: TITLE: <a short 2-5 word campaign title, max 30 characters>. Then write your answer in plain text with the following sections, in this exact order. Do not add decorative separator lines (no ==== or ----).
 
-========================================
 WORLD SUMMARY:
-========================================
-Write 3–8 sentences describing the core identity of the world.
+Write 3-8 sentences describing the core identity of the world.
 Include:
 - genre
 - tone
@@ -23,9 +21,9 @@ Include:
 - important themes
 - what makes this world unique
 
-========================================
+
 LORE:
-========================================
+
 Write 3–5 paragraphs of deeper worldbuilding.
 Include:
 - major cultures or civilizations
@@ -34,42 +32,32 @@ Include:
 - political or supernatural forces
 - current tensions that adventurers might encounter
 
-========================================
 MAJOR LOCATIONS (1):
-========================================
 List exactly ONE major exploration hubs.
 For each:
-- NAME (1–3 words)
-- 2–4 sentences describing purpose, atmosphere, and important features.
+- NAME (1-3 words)
+- 2-4 sentences describing purpose, atmosphere, and important features.
 
 Format example:
-1. NAME — description...
+1. NAME - description...
 
-========================================
 MINOR LOCATIONS (2):
-========================================
 List exactly TWO smaller adventuring or quest-oriented locations.
 For each:
 - NAME
-- 1–3 sentences describing its danger, mystery, or purpose.
+- 1-3 sentences describing its danger, mystery, or purpose.
 
 Use the same numbering format.
 
-========================================
 WORLD SKILLS:
-========================================
-List 10–20 skills used by characters in this world.
+List 10-20 skills used by characters in this world.
 One skill per line.
 No descriptions.
 
-========================================
 THEMES & TONE:
-========================================
-Write 3–6 bullet points about the overall mood, narrative direction, and recurring motifs.
+Write 3-6 bullet points about the overall mood, narrative direction, and recurring motifs.
 
-========================================
 PLAYER START :
-========================================
 Start the player in one of the locations, based upon the character they create.                                   
 
 {setting}
@@ -81,6 +69,7 @@ Do NOT:
 - repeat these instructions
 - invent new headers not listed above
 - ask questions
+- add visual separator lines like "====" or "----"
 
 Write all text in a consistent, friendly, descriptive TTRPG tone.
 """)
@@ -139,15 +128,6 @@ def generate_world_state(setting_prompt: str, players: List[str], world_id: str 
     return world
 
 
-def _sanitize_world_text(text: str) -> str:
-    """
-    Light cleanup: remove obvious code tags and trim.
-    """
-    cleaned = text.replace("<code>", "").replace("</code>", "")
-    cleaned = cleaned.strip()
-    return cleaned
-
-
 def _infer_title_from_summary(world_summary: str, fallback_setting: str) -> str:
     """
     Derive a campaign title from the summary text.
@@ -191,16 +171,25 @@ def _infer_title_from_summary(world_summary: str, fallback_setting: str) -> str:
 
 def _sanitize_world_text(text: str) -> str:
     """
-    Light cleanup: remove obvious code tags and trim.
+    Light cleanup: remove obvious code tags, separator bars, and trim.
     """
     cleaned = text.replace("<code>", "").replace("</code>", "")
-    return cleaned.strip()
+
+    # Remove decorative separators like ====, ----, ====123, etc.
+    lines = []
+    for line in cleaned.splitlines():
+        if re.match(r"^\s*[=\-]{3,}\s*\d*(\s*lines?)?\s*$", line, flags=re.IGNORECASE):
+            continue
+        lines.append(line)
+
+    return "\n".join(lines).strip()
 
 
 def _split_sections(text: str) -> Dict[str, str]:
     """
     Split the model output into sections based on our headers:
 
+    TITLE:
     WORLD SUMMARY:
     LORE:
     MAJOR LOCATIONS (3):
@@ -214,12 +203,16 @@ def _split_sections(text: str) -> Dict[str, str]:
     for raw_line in text.splitlines():
         line = raw_line.strip()
 
-        # skip empty separator lines like "====="
-        if set(line) == {"="}:
+        # skip separator lines like "====" or "----- 123"
+        if re.match(r"^\s*[=\-]{3,}\s*\d*(\s*lines?)?\s*$", line, flags=re.IGNORECASE):
             continue
 
         # detect headers (we use startswith so the model can be a bit fuzzy)
-        if line.upper().startswith("WORLD SUMMARY:"):
+        if line.upper().startswith("TITLE:"):
+            current_key = "TITLE"
+            sections[current_key] = []
+            continue
+        elif line.upper().startswith("WORLD SUMMARY:"):
             current_key = "WORLD SUMMARY"
             sections[current_key] = []
             continue
@@ -338,6 +331,10 @@ def _parse_world_output(text: str, fallback_setting: str) -> Tuple[
 
     sections = _split_sections(cleaned)
 
+    explicit_title = sections.get("TITLE", "").strip()
+    if explicit_title:
+        explicit_title = re.sub(r"^TITLE:\s*", "", explicit_title, flags=re.IGNORECASE).strip()
+
     world_summary = sections.get("WORLD SUMMARY", "").strip()
     if not world_summary:
         world_summary = fallback_setting.strip()
@@ -352,10 +349,18 @@ def _parse_world_output(text: str, fallback_setting: str) -> Tuple[
     major_locations = _parse_locations_section(major_block) if major_block else []
     minor_locations = _parse_locations_section(minor_block) if minor_block else []
 
+    # Fallback: if no locations were parsed, try to lift numbered entries from lore.
+    if not major_locations and not minor_locations and lore:
+        fallback_locations = _parse_locations_section(lore)
+        if fallback_locations:
+            # Treat the first as major, rest as minor for a basic split.
+            major_locations = fallback_locations[:1]
+            minor_locations = fallback_locations[1:]
+
     skills = _parse_bullet_list(skills_block)
     themes = _parse_bullet_list(themes_block)
 
-    # Use your existing title inference helper
-    title = _infer_title_from_summary(world_summary, fallback_setting)
+    # Prefer explicit title if provided, else infer from summary
+    title = explicit_title or _infer_title_from_summary(world_summary, fallback_setting)
 
     return title, world_summary, lore, skills, major_locations, minor_locations, themes

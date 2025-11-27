@@ -147,6 +147,7 @@ class NPC:
     hooks: List[str] = field(default_factory=list)
     attitude: str = "neutral"
     tags: List[str] = field(default_factory=list)
+    inventory: List[str] = field(default_factory=list)
     
     created_on: datetime = field(default_factory=datetime.utcnow)
     last_updated: Optional[datetime] = None
@@ -185,6 +186,7 @@ class NPC:
             hooks=list(data.get("hooks", [])),
             attitude=data.get("attitude", "neutral"),
             tags=list(data.get("tags", [])),
+            inventory=list(data.get("inventory", [])),
             created_on=created_on,
             last_updated=last_updated,
         )
@@ -203,6 +205,7 @@ class Quest:
 
     steps: List[str] = field(default_factory=list)
     rewards: List[str] = field(default_factory=list)
+    reward_items: List[str] = field(default_factory=list)
 
     status: str = "available"  # "available", "in_progress", "completed", "failed"
 
@@ -243,7 +246,57 @@ class Quest:
             target_location=data.get("target_location"),
             steps=list(data.get("steps", [])),
             rewards=list(data.get("rewards", [])),
+            reward_items=list(data.get("reward_items", [])),
             status=data.get("status", "available"),
+            created_on=created_on,
+            last_updated=last_updated,
+        )
+    
+
+@dataclass
+class Item:
+    item_id: str
+    item_name: str
+    item_category: str = ""
+    item_subcategory: str = ""
+    item_dice_damage: str = ""
+    item_damage_type: str = ""
+    item_properties: List[str] = field(default_factory=list)
+    created_on: datetime = field(default_factory=datetime.utcnow)
+    last_updated: Optional[datetime] = None
+
+    def to_dict(self) -> dict:
+        data = asdict(self)
+        if isinstance(self.created_on, datetime):
+            data["created_on"] = self.created_on.isoformat()
+        if isinstance(self.last_updated, datetime):
+            data["last_updated"] = self.last_updated.isoformat()
+        return data
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "Item":
+        created_raw = data.get("created_on")
+        updated_raw = data.get("last_updated")
+        item_properties = list(data.get("item_properties", []))
+        created_on = (
+            datetime.fromisoformat(created_raw)
+            if isinstance(created_raw, str)
+            else datetime.utcnow()
+        )
+        last_updated = (
+            datetime.fromisoformat(updated_raw)
+            if isinstance(updated_raw, str)
+            else None
+        )
+
+        return cls(
+            item_id=data["item_id"],
+            item_name=data.get("item_name", ""),
+            item_category=data.get("item_category", ""),
+            item_subcategory=data.get("item_subcategory", ""),
+            item_dice_damage=data.get("item_dice_damage", ""),
+            item_damage_type=data.get("item_damage_type", ""),
+            item_properties=item_properties,
             created_on=created_on,
             last_updated=last_updated,
         )

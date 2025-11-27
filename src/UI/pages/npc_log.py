@@ -1,4 +1,4 @@
-import sys
+﻿import sys
 from pathlib import Path
 
 import streamlit as st
@@ -9,6 +9,8 @@ if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))
 
 from src.game.game_state import get_global_games
+from src.game.npc_store import save_npcs
+from src.agent.item_gen import generate_items_for_character
 
 
 def get_game_and_world():
@@ -70,11 +72,32 @@ for location in sorted(npcs_by_location.keys()):
             if "merchant" in role_lower:
                 highlight = " 🛒"
             elif "leader" in role_lower:
-                highlight = " 🏰"
+                highlight = " ⭐"
             elif "quest" in role_lower:
-                highlight = " 🗺️"
+                highlight = " 📜"
 
             st.markdown(f"**{name}** — {role}{highlight}")
             if desc:
                 st.markdown(f"> {desc}")
+
+            if getattr(npc, "inventory", None):
+                with st.expander("Inventory", expanded=False):
+                    for item in npc.inventory:
+                        st.markdown(f"- {item}")
+
+            if "merchant" in role_lower or "vendor" in role_lower or "shop" in role_lower:
+                if st.button(f"Refresh stock for {name}", key=f"refresh_{npc.npc_id}"):
+                    try:
+                        items = generate_items_for_character(
+                            world_summary=world.world_summary if world else "",
+                            archetype="merchant_stock",
+                            count=4,
+                        )
+                        npc.inventory = [f"{it.item_name} ({it.item_category or 'gear'})" for it in items]
+                        game.npcs[npc.npc_id] = npc
+                        save_npcs(game.world.world_id, game.npcs)
+                        st.success(f"Updated stock for {name}.")
+                    except Exception as e:
+                        st.error(f"Could not refresh stock: {e}")
+
             st.markdown("---")

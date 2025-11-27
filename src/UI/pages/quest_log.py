@@ -76,3 +76,7 @@ for quest_id, quest in sorted(quests.items(), key=lambda kv: kv[1].title.lower()
             st.markdown("**Rewards:**")
             for r in quest.rewards:
                 st.markdown(f"- {r}")
+        if getattr(quest, "reward_items", None):
+            st.markdown("**Item Rewards:**")
+            for r in quest.reward_items:
+                st.markdown(f"- {r}")

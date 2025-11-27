@@ -67,6 +67,10 @@ def chat_completion(
 
     llm = get_llm()
     prompt = format_prompt(messages)
+    # Debug: show the prompt in the console
+    print("\n=== LLM PROMPT START ===\n")
+    print(prompt)
+    print("\n=== LLM PROMPT END ===\n")
     result = llm(
         prompt,
         max_tokens=max_tokens,
@@ -75,7 +79,7 @@ def chat_completion(
         top_k=40,
         repeat_penalty=1.1,
         # Stop the model as soon as it tries to start a new turn or switch speaker
-        stop=["[PLAYER", "[ASSISTANT", "[SYSTEM", "</s>"],
+        stop=["[PLAYER", "[ASSISTANT", "[SYSTEM", "[ITEM", "</s>"],
     )
 
     choices = result.get("choices", [])

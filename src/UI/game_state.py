@@ -31,3 +31,6 @@ def reset_game(game: GameState) -> None:
     game.active_turn_index = 0
     if hasattr(game, "turn_log"):
         delattr(game, "turn_log")
+    game.busy = False
+    game.busy_by = None
+    game.busy_task = None

@@ -1,4 +1,5 @@
 import sys
+import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -50,7 +51,6 @@ game, game_id, players_raw, startbutton, initiative_sidebar = render_sidebar(gam
 # Parse local player names
 player_names = [p.strip() for p in players_raw.split(",") if p.strip()]
 st.session_state.player_names = player_names
-game.player_names = player_names
 
 # Reset game if requested
 if startbutton:
@@ -68,7 +68,17 @@ if not world_exists:
 elif world_exists and not pcs_exist:
     chat_prompt = "World created. Make characters first."
 else:
-    chat_prompt = "Play your turn. Use /action for mechanics."
+    started = any(
+        m.role == "user"
+        and m.content.strip().lower() in {"start", "begin", "let's begin", "lets begin", "i am ready"}
+        for m in game.messages
+    )
+    if not started:
+        chat_prompt = "Lets begin our adventure. Type <Start> to begin."
+    else:
+        chat_prompt = (
+            "Input your choice here. You can use /action for mechanics; format actions like {/action I shoot} etc."
+        )
 
 user_input = st.chat_input(chat_prompt)
 speaker_label = st.session_state.get("current_speaker")
@@ -78,6 +88,15 @@ default_speaker = (
     else "Player"
 )
 speaker = speaker_label or default_speaker
+
+# Shared busy indicator so all sessions know someone is using the model
+if getattr(game, "busy", False):
+    st.warning(
+        f"Model busy: {game.busy_task or 'In progress'} "
+        f"(started by {game.busy_by or 'another player'})."
+    )
+    time.sleep(0.8)
+    st.rerun()
 
 
 # World creation

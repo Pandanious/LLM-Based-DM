@@ -41,6 +41,38 @@ def save_world_bundle(game: GameState, dest_dir: Path | str = "saves/bundles") -
     return bundle_path
 
 
+def save_world_seed_bundle(game: GameState, dest_dir: Path | str = "saves/bundles") -> Path:
+    """
+    Save a deterministic bundle keyed to the world + players so you can reload
+    without re-running world generation. Overwrites if the same world/players
+    combination is saved again.
+    """
+    if game.world is None:
+        raise ValueError("Cannot save bundle: world is missing.")
+
+    world_slug = _slug(getattr(game.world, "title", "") or game.world.world_id)
+    players = list(getattr(game.world, "players", []) or game.player_names or [])
+    players_slug = "-".join(_slug(p) for p in players) or "no_players"
+
+    dest = Path(dest_dir)
+    dest.mkdir(parents=True, exist_ok=True)
+    filename = f"{world_slug}_{players_slug}.json"
+    bundle_path = dest / filename
+
+    data: Dict[str, Any] = {
+        "saved_at": datetime.utcnow().strftime("%Y-%m-%d_%H-%M-%S"),
+        "world": game.world.to_dict() if hasattr(game.world, "to_dict") else {},
+        "players": {pc_id: pc.to_dict() for pc_id, pc in (game.player_characters or {}).items()},
+        "npcs": {npc_id: npc.to_dict() for npc_id, npc in (game.npcs or {}).items()},
+        "quests": {qid: quest.to_dict() for qid, quest in (game.quests or {}).items()},
+        "initiative_order": list(game.initiative_order or []),
+        "active_turn_index": game.active_turn_index,
+    }
+
+    bundle_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    return bundle_path
+
+
 def load_world_bundle(path_or_bytes: Path | str | bytes) -> Tuple[World_State, Dict[str, PlayerCharacter], Dict[str, NPC], Dict[str, Quest], list, int]:
     """
     Load a bundle produced by save_world_bundle and return its components.

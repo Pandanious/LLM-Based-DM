@@ -1,7 +1,10 @@
+import time
 import streamlit as st
 import streamlit.components.v1 as components
 
 from src.game.game_state import GameState
+
+CHAT_REFRESH_SECONDS = 2.5
 
 
 def render_chat_log(game: GameState) -> None:
@@ -9,7 +12,15 @@ def render_chat_log(game: GameState) -> None:
     Render the game log, scroll button, and speaker selector.
     """
     st.subheader("Game Log")
-    st.caption("Use Scroll button to jump to bottom.")
+    st.caption("Chat auto-refreshes so everyone sees the latest messages; scroll button is still available.")
+
+    # Per-session toggle so multiple open browsers keep in sync without manual refresh.
+    auto_refresh = st.checkbox(
+        "Auto-refresh chat (all tabs)",
+        value=st.session_state.get("chat_auto_refresh", True),
+        key="chat_auto_refresh",
+        help="Keeps the log in sync across open browsers. Turn off if you are drafting a long message.",
+    )
 
     # Scroll-to-latest button
     if st.button("Scroll to latest message"):
@@ -26,6 +37,12 @@ def render_chat_log(game: GameState) -> None:
         )
 
     # Render chat history
+    game_key = st.session_state.get("game_id", "default")
+    last_seen_key = f"chat_last_seen_{game_key}"
+    last_seen = st.session_state.get(last_seen_key, 0)
+    new_message = len(game.messages) > last_seen
+    st.session_state[last_seen_key] = len(game.messages)
+
     for msg in game.messages:
         if msg.role == "user":
             with st.chat_message("user"):
@@ -33,6 +50,20 @@ def render_chat_log(game: GameState) -> None:
         elif msg.role == "assistant":
             with st.chat_message("assistant"):
                 st.markdown(msg.content)
+
+    # Auto-scroll when a new message arrives (useful with auto-refresh on).
+    if new_message:
+        components.html(
+            """
+            <script>
+            const doc = window.parent.document || document;
+            const block = doc.querySelector('.block-container');
+            if (block) block.scrollTop = block.scrollHeight;
+            doc.documentElement.scrollTop = doc.documentElement.scrollHeight;
+            </script>
+            """,
+            height=0,
+        )
 
     # Speaker selector (use player:character when PCs exist)
     if game.player_characters:
@@ -55,3 +86,7 @@ def render_chat_log(game: GameState) -> None:
         )
     else:
         st.info("Add players in sidebar.")
+
+    if auto_refresh:
+        time.sleep(CHAT_REFRESH_SECONDS)
+        st.rerun()

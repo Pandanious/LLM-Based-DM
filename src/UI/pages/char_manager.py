@@ -42,19 +42,19 @@ def render_character_card(pc) -> None:
                 st.metric(key, pc.stats.get(key, 10))
 
         if pc.skills:
-            st.markdown("**Skills:**")
-            for s in pc.skills:
-                st.markdown(f"- {s}")
+            with st.expander("Skills", expanded=False):
+                for s in pc.skills:
+                    st.markdown(f"- {s}")
 
         if pc.inventory:
-            st.markdown("**Inventory:**")
-            for item in pc.inventory:
-                st.markdown(f"- {item}")
+            with st.expander("Inventory", expanded=False):
+                for item in pc.inventory:
+                    st.markdown(f"- {item}")
 
         if pc.notes:
-            st.markdown("**Notes:**")
-            for note in pc.notes:
-                st.markdown(f"- {note}")
+            with st.expander("Notes", expanded=False):
+                for note in pc.notes:
+                    st.markdown(f"- {note}")
 
 # layout
 
@@ -68,6 +68,12 @@ st.markdown(f"**Game ID:** `{game_id}`")
 if world is None:
     st.stop()
 
+if getattr(game, "busy", False):
+    st.info(
+        f"Model busy: {game.busy_task or 'In progress'} "
+        f"(started by {game.busy_by or 'another player'})."
+    )
+
 st.markdown(f"**World:** {world.title}")
 st.markdown(world.world_summary)
 st.markdown("---")
@@ -78,7 +84,11 @@ st.subheader("Local Players at This Browser")
 
 if "local_player_names" not in st.session_state:
     # Prefer names set on the main page; fallback to game-stored names; else placeholder
-    base = st.session_state.get("player_names", []) or getattr(game, "player_names", [])
+    base = (
+        st.session_state.get("player_names", [])
+        or getattr(game, "player_names", [])
+        or getattr(game.world, "players", [])
+    )
     if base:
         st.session_state.local_player_names = list(base)
     else:
@@ -86,7 +96,7 @@ if "local_player_names" not in st.session_state:
 
 players_csv = st.text_input(
     "Player names (comma-separated, local to this browser)",
-    value=", ".join(st.session_state.local_player_names),
+    placeholder=", ".join(st.session_state.local_player_names),
     help=(
         "Everyone who connects with this Game ID shares the same world and characters. "
         "These names are just for this browser's character generation UI."
@@ -96,7 +106,6 @@ players_csv = st.text_input(
 local_player_names = [p.strip() for p in players_csv.split(",") if p.strip()]
 st.session_state.local_player_names = local_player_names
 st.session_state.player_names = local_player_names
-game.player_names = local_player_names
 
 if not local_player_names:
     st.info("Add at least one player name above to start creating characters.")
@@ -156,7 +165,7 @@ for player_name in local_player_names:
         key=concept_key,
         value=default_concept,
         height=80,
-        placeholder="e.g. A jaded street doctor who patches up gangsters for cash.",
+        placeholder="e.g. The model can ignore obtuse prompts/inputs.""\nTry to keep it close to the world generated.",
     )
 
     cols = st.columns([1, 1])
@@ -208,22 +217,38 @@ else:
     for idx, item in enumerate(queue, start=1):
         st.caption(f"{idx}. {item['player_name']} \u2192 {item['char_name']} ({item['ancestry']})")
 
-process_disabled = not queue or st.session_state[busy_key]
+global_busy = getattr(game, "busy", False)
+if global_busy:
+    st.warning(
+        f"Character generation locked: {game.busy_task or 'In progress'} "
+        f"(started by {game.busy_by or 'another player'})."
+    )
+process_disabled = (not queue) or st.session_state[busy_key] or global_busy
 if st.button("Process next queued generation", disabled=process_disabled):
     st.session_state[busy_key] = True
     job = queue.pop(0)
-    with st.spinner(f"Generating character for {job['player_name']}..."):
-        pc = generate_character_sheet(
-            world_summary=world.world_summary,
-            world_skills=world.skills,
-            player_name=job["player_name"],
-            character_prompt=job["concept"],
-            pc_id=job["pc_id"],
-            char_name=job["char_name"],
-            gender=job["gender"],
-            ancestry=job["ancestry"],
-        )
-        game.player_characters[job["pc_id"]] = pc
-        save_player_characters(world.world_id, game.player_characters)
-        st.success(f"Character generated for {job['player_name']}: {pc.name}")
-    st.session_state[busy_key] = False
+    game.busy = True
+    game.busy_by = job["player_name"]
+    game.busy_task = "Generating character"
+    try:
+        with st.spinner(f"Generating character for {job['player_name']}..."):
+            pc = generate_character_sheet(
+                world_summary=world.world_summary,
+                world_skills=world.skills,
+                player_name=job["player_name"],
+                character_prompt=job["concept"],
+                pc_id=job["pc_id"],
+                char_name=job["char_name"],
+                gender=job["gender"],
+                ancestry=job["ancestry"],
+            )
+            game.player_characters[job["pc_id"]] = pc
+            save_player_characters(world.world_id, game.player_characters)
+            st.success(f"Character generated for {job['player_name']}: {pc.name}")
+    except Exception as e:
+        st.error(f"Character generation failed: {e}")
+    finally:
+        game.busy = False
+        game.busy_by = None
+        game.busy_task = None
+        st.session_state[busy_key] = False

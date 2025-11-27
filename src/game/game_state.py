@@ -18,6 +18,9 @@ class GameState:
     active_encounter: Optional[str] = None
     active_encounter_summary: Optional[str] = None
     encounter_history: List[str] = field(default_factory=list)
+    busy: bool = False  # shared flag so all sessions know the model is running
+    busy_by: Optional[str] = None  # who triggered the work
+    busy_task: Optional[str] = None  # what is running
 
 @lru_cache(maxsize=1)
 def get_global_games() -> Dict[str, GameState]:

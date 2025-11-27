@@ -6,6 +6,7 @@ from typing import Dict, List
 from src.llm_client import get_llm
 from src.game.models import PlayerCharacter
 from src.game.dice import roll_dice
+from src.agent.item_gen import generate_items_for_character
 
 
 END_MARKER = "<<CHARACTER_SHEET_COMPLETE>>"
@@ -35,14 +36,14 @@ The player describes the character idea as:
 
 Your job:
 - Keep the NAME, GENDER and ANCESTRY exactly as given. Do not change them.
+- Do NOT sanitize, correct, replace, or reinterpret player-provided values, even if they seem absurd or contradictory; honor them verbatim and work them into the world context as best you can.
 - Choose an archetype (class/role) that fits the idea and world.
-- Refine the concept into 2–4 sentences. Do NOT repeat the same sentence or idea twice.
+- Refine the concept into 2-4 sentences. Do NOT repeat the same sentence or idea twice.
 - Use a simple stat system with STR, DEX, CON, INT, WIS, CHA (values between 3 and 18).
 - Set LEVEL = 1.
-- Choose 3–6 appropriate skills from this list of skills in the world:
+- Choose 3-6 appropriate skills from this list of skills in the world:
   {{world_skills}}
 - Give a reasonable MAX HP value for a level 1 character.
-- Suggest a small starting INVENTORY (3–6 items).
 
 Important style rules:
 - Do NOT repeat yourself. Avoid saying the same thing in different words.
@@ -81,11 +82,6 @@ SKILLS:
 - <skill 2>
 - <skill 3>
 
-INVENTORY:
-- <item 1>
-- <item 2>
-- <item 3>
-
 END: {END_MARKER}
 """)
 
@@ -116,16 +112,22 @@ def generate_character_sheet(
         world_skills=skills_str,
     )
 
-    result = llm(
-        prompt,
-        max_tokens=600,
-        temperature=0.65,   # a bit lower for more discipline
-        top_p=0.9,
-        top_k=40,
-        repeat_penalty=1.2,  # slightly stronger to reduce rambling
-    )
-
-    raw = _clean_raw_text(result["choices"][0]["text"])
+    raw = ""
+    max_attempts = 3
+    for attempt in range(1, max_attempts + 1):
+        result = llm(
+            prompt,
+            max_tokens=600,
+            temperature=0.65,   # a bit lower for more discipline
+            top_p=0.9,
+            top_k=40,
+            repeat_penalty=1.2,  # slightly stronger to reduce rambling
+        )
+        raw = _clean_raw_text(result["choices"][0]["text"])
+        if _looks_like_sheet(raw):
+            break
+        if attempt == max_attempts:
+            raise ValueError("Character generation did not return a usable sheet after retries.")
 
     return _parse_character_text(
         raw_text=raw,
@@ -134,6 +136,7 @@ def generate_character_sheet(
         fixed_name=char_name,
         fixed_gender=gender,
         fixed_ancestry=ancestry,
+        world_summary=world_summary,
     )
 
 def _parse_stat_block(block: str) -> Dict[str, int]:
@@ -249,7 +252,9 @@ def _parse_character_text(
     player_name: str,
     fixed_name: str,
     fixed_gender: str,
-    fixed_ancestry: str,) -> PlayerCharacter:
+    fixed_ancestry: str,
+    world_summary: str,
+) -> PlayerCharacter:
     
     #Parse the LLM's character text into a PlayerCharacter. Keeps name, gender etc user choices.
     
@@ -283,17 +288,10 @@ def _parse_character_text(
 
     # Skills
     skills_match = re.search(
-        r"SKILLS:\s*(.+?)(?:\n\n|INVENTORY:)", text, re.DOTALL | re.IGNORECASE
+        r"SKILLS:\s*(.+)$", text, re.DOTALL | re.IGNORECASE
     )
     skills_block = skills_match.group(1) if skills_match else ""
     skills = _parse_list_block(skills_block)
-
-    # Inventory
-    inv_match = re.search(
-        r"INVENTORY:\s*(.+)$", text, re.DOTALL | re.IGNORECASE
-    )
-    inv_block = inv_match.group(1) if inv_match else ""
-    inventory = _parse_list_block(inv_block)
 
     now = datetime.utcnow()
 
@@ -310,7 +308,6 @@ def _parse_character_text(
         max_hp=max_hp,
         current_hp=max_hp,
         skills=skills,
-        inventory=inventory,
         notes=[],
         created_on=now,
         last_updated=now,    )
@@ -323,4 +320,34 @@ def _parse_character_text(
         # Fallback so we never crash character generation
         pc.initiative = 0
 
+    # Generate starter gear separately and attach simple labels to inventory
+    try:
+        items = generate_items_for_character(world_summary=world_summary, archetype=archetype, count=4)
+        inv_labels: List[str] = []
+        for it in items:
+            cat = it.item_category or "gear"
+            sub = f"/{it.item_subcategory}" if it.item_subcategory else ""
+            dmg = ""
+            if it.item_dice_damage and it.item_dice_damage != "-":
+                dmg = f" | dmg {it.item_dice_damage}"
+                if it.item_damage_type:
+                    dmg += f" ({it.item_damage_type})"
+            label = f"{it.item_name} ({cat}{sub}){dmg}"
+            inv_labels.append(label)
+        if inv_labels:
+            pc.inventory = inv_labels
+    except Exception:
+        # Keep inventory empty on failure
+        pass
+
     return pc
+
+
+def _looks_like_sheet(text: str) -> bool:
+    """
+    Cheap validation to see if the LLM returned something structured enough to parse.
+    """
+    if not text.strip():
+        return False
+    markers = ["ARCHETYPE:", "STATS:", "SKILLS:"]
+    return any(m in text for m in markers)

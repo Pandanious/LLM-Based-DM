@@ -62,7 +62,7 @@ def render_sidebar(
 
         # Help
         if st.button("Help / How to Interact"):
-            help_url = f"http://localhost:8501/help?game_id={game_id}"
+            help_url = f"/help?game_id={game_id}"
             components.html(
                 f"""
                 <script>

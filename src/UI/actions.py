@@ -12,17 +12,12 @@ from src.agent.quest_gen import generate_quests_for_world
 from src.game.quest_store import save_quests
 from src.agent.quest_commands import handle_quest_command
 from src.agent.dm_dice import dm_turn_with_dice
-from src.game.turn_store import (
-    load_turn_log,
-    add_turn_note,
-    save_turn_log,
-    add_turn_action,
-)
+from src.game.turn_store import load_turn_log,add_turn_note,save_turn_log,add_turn_action,begin_turn
 from src.game.game_state import GameState
 from src.game.models import PlayerCharacter
 from src.agent.encounter_build import detect_encounter, encounter_prompt
 from src.UI.mechanics_prompt import refresh_mechanics_prompt
-from src.UI.initiative import current_actor
+from src.UI.initiative import current_actor, add_turn_system_message
 
 
 def _resolve_actor(game: GameState, speaker: str) -> Optional[PlayerCharacter]:
@@ -55,8 +50,12 @@ def handle_world_creation(user_input: str, game_id: str, game: GameState) -> Non
     desc_msg = Message(role="user", content=user_input, speaker="Player")
     game.messages.append(desc_msg)
 
-    with st.spinner("Forging world..."):
-        world = generate_world_state(
+    game.busy = True
+    game.busy_by = "World creation"
+    game.busy_task = "Forging world..."
+    try:
+        with st.spinner("Forging world..."):
+            world = generate_world_state(
             setting_prompt=user_input,
             players=st.session_state.get("player_names") or ["Player"],
             world_id=game_id,
@@ -96,6 +95,10 @@ def handle_world_creation(user_input: str, game_id: str, game: GameState) -> Non
         )
 
         game.turn_log = load_turn_log(world.world_id)
+    finally:
+        game.busy = False
+        game.busy_by = None
+        game.busy_task = None
 
 
 def handle_gameplay_input(user_input: str, game: GameState, speaker: str) -> None:
@@ -115,7 +118,9 @@ def handle_gameplay_input(user_input: str, game: GameState, speaker: str) -> Non
 
     # 2) Start-game normalization
     normalized = user_input.strip().lower()
+    is_start = False
     if normalized in {"start", "begin", "let's begin", "i am ready"}:
+        is_start = True
         if len(game.player_characters) == 1:
             pc = next(iter(game.player_characters.values()))
             user_input = (
@@ -134,6 +139,37 @@ def handle_gameplay_input(user_input: str, game: GameState, speaker: str) -> Non
     game.messages.append(
         Message(role="user", content=user_input, speaker=speaker)
     )
+
+    # If this is the kickoff prompt, instruct the DM to name the party and active turn.
+    if is_start:
+        party_labels = []
+        for pc in game.player_characters.values():
+            party_labels.append(f"{pc.player_name} as {pc.name}")
+        party_text = ", ".join(party_labels) or "the party"
+        turn_label = "no initiative set yet"
+        active_pc = current_actor(game)
+        if active_pc:
+            turn_label = f"{active_pc.player_name} as {active_pc.name}"
+        game.messages.append(
+            Message(
+                role="system",
+                content=(
+                    "Opening scene guidance: explicitly mention the whole party "
+                    f"({party_text}) and state whose turn it is ({turn_label}). "
+                    "Then describe the scene."
+                ),
+            )
+        )
+        # Auto-advance to the current actor so everyone sees whose turn it is.
+        if game.initiative_order:
+            actor = current_actor(game)
+            if actor:
+                add_turn_system_message(game, actor)
+                if game.world is not None:
+                    if not hasattr(game, "turn_log"):
+                        game.turn_log = load_turn_log(game.world.world_id)
+                    game.turn_log = begin_turn(game.turn_log, actor)
+                    save_turn_log(game.turn_log)
 
     # 3a) Enforce initiative order: block out-of-turn actions
     if game.initiative_order:
@@ -173,8 +209,12 @@ def handle_gameplay_input(user_input: str, game: GameState, speaker: str) -> Non
             save_turn_log(game.turn_log)
 
     # 4) DM turn, with dice support for /action
-    with st.spinner("The DM is thinking..."):
-        game.messages = dm_turn_with_dice(
+    game.busy = True
+    game.busy_by = speaker
+    game.busy_task = "DM is thinking..."
+    try:
+        with st.spinner("The DM is thinking..."):
+            game.messages = dm_turn_with_dice(
             game.messages,
             game.player_characters,
         )
@@ -217,5 +257,9 @@ def handle_gameplay_input(user_input: str, game: GameState, speaker: str) -> Non
                                 f"Next up: {next_pc.player_name} as {next_pc.name}. "
                                 "Press Next Turn to hand over."
                             ),
-                        )
                     )
+                )
+    finally:
+        game.busy = False
+        game.busy_by = None
+        game.busy_task = None

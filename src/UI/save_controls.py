@@ -5,7 +5,7 @@ from src.agent.types import Message
 from src.agent.party_summary import build_party_summary
 from src.game.player_store import load_player_characters
 from src.game.party_store import save_party_summary
-from src.game.save_load import save_world_bundle, load_world_bundle
+from src.game.save_load import save_world_bundle, save_world_seed_bundle, load_world_bundle
 from src.game.turn_store import load_turn_log
 from src.game.game_state import GameState
 
@@ -16,6 +16,11 @@ def render_save_controls(game: GameState) -> None:
     and refreshing the party summary. To be called inside the sidebar.
     """
     save_state_clicked = st.button("Save world state", disabled=game.world is None)
+    quick_seed_clicked = st.button(
+        "Auto-save world seed (title + players)",
+        disabled=game.world is None,
+        help="Writes a deterministic bundle named after the world title and players so you can reload without re-forging.",
+    )
     bundle_file = st.file_uploader("Load world state (bundle .json)", type=["json"])
 
     # Save current world bundle
@@ -25,6 +30,14 @@ def render_save_controls(game: GameState) -> None:
             st.success(f"Game state saved to {export_path}")
         except Exception as e:
             st.error(f"Could not save game state: {e}")
+
+    # Save deterministic bundle keyed to world title + players
+    if quick_seed_clicked:
+        try:
+            export_path = save_world_seed_bundle(game)
+            st.success(f"World seed saved to {export_path}")
+        except Exception as e:
+            st.error(f"Could not save seed bundle: {e}")
 
     # Load bundle
     if bundle_file is not None:

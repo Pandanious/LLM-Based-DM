@@ -11,8 +11,8 @@ SAVES_DIR.mkdir(exist_ok=True)
 
 
 
-max_CTX = 8192  ## max memory -> ~3000 words.
+max_CTX = 4096  ## max memory -> ~3000 words.
 cpu_threads = 12 
-gpu_layers = 32
+gpu_layers = 24
 default_temp = 0.7 ## I guess how bohemiean it is?
 default_max_tokens = 600
