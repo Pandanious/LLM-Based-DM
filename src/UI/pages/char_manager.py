@@ -1,13 +1,30 @@
 import streamlit as st
+from streamlit.errors import StreamlitAPIException
 
 from src.game.game_state import get_global_games
 from src.game.player_store import save_player_characters
 from src.agent.char_gen import generate_character_sheet
 
+# Page config must be set before any other Streamlit calls.
+try:
+    st.set_page_config(page_title="Character Manager", layout="wide")
+except StreamlitAPIException:
+    # Ignore if another page already set it in this run.
+    pass
+
+# Hide Streamlit's built-in page navigation links (use sidebar buttons instead).
+st.markdown(
+    """
+    <style>
+    [data-testid="stSidebarNav"] { display: none; }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
 
 def get_game_and_world():
     query_params = st.query_params
-    game_id = query_params.get("game_id", "default")
+    game_id = query_params.get("game_id") or st.session_state.get("game_id") or "default"
 
     games = get_global_games()
     game = games.get(game_id)
@@ -34,31 +51,38 @@ def render_character_card(pc) -> None:
         st.markdown(f"**HP:** {pc.current_hp} / {pc.max_hp}")
         st.markdown(f"**Initiative:** {getattr(pc, 'initiative', '?')}")
 
-
         st.markdown("**Stats**")
         cols = st.columns(6)
         for i, key in enumerate(["STR", "DEX", "CON", "INT", "WIS", "CHA"]):
             with cols[i]:
-                st.metric(key, pc.stats.get(key, 10))
+                st.metric(key, (pc.stats or {}).get(key, 10))
 
-        if pc.skills:
-            with st.expander("Skills", expanded=False):
-                for s in pc.skills:
-                    st.markdown(f"- {s}")
+        skills = pc.skills or []
+        if isinstance(skills, (str, bytes)):
+            skills = [skills]
+        if skills:
+            st.markdown("**Skills**")
+            for s in skills:
+                st.markdown(f"- {s}")
 
-        if pc.inventory:
-            with st.expander("Inventory", expanded=False):
-                for item in pc.inventory:
-                    st.markdown(f"- {item}")
+        inventory = pc.inventory or []
+        if isinstance(inventory, (str, bytes)):
+            inventory = [inventory]
+        if inventory:
+            st.markdown("**Inventory**")
+            for item in inventory:
+                st.markdown(f"- {item}")
 
-        if pc.notes:
-            with st.expander("Notes", expanded=False):
-                for note in pc.notes:
-                    st.markdown(f"- {note}")
+        notes = pc.notes or []
+        if isinstance(notes, (str, bytes)):
+            notes = [notes]
+        if notes:
+            st.markdown("**Notes**")
+            for note in notes:
+                st.markdown(f"- {note}")
 
 # layout
 
-st.set_page_config(page_title="Character Manager", layout="wide")
 st.title("Character Manager")
 
 game, world, game_id = get_game_and_world()
@@ -96,6 +120,7 @@ if "local_player_names" not in st.session_state:
 
 players_csv = st.text_input(
     "Player names (comma-separated, local to this browser)",
+    value=", ".join(st.session_state.local_player_names),
     placeholder=", ".join(st.session_state.local_player_names),
     help=(
         "Everyone who connects with this Game ID shares the same world and characters. "
@@ -104,6 +129,10 @@ players_csv = st.text_input(
 )
 
 local_player_names = [p.strip() for p in players_csv.split(",") if p.strip()]
+# If the input is left blank, keep the previously inferred names instead of stopping the page.
+if not local_player_names:
+    local_player_names = st.session_state.local_player_names
+
 st.session_state.local_player_names = local_player_names
 st.session_state.player_names = local_player_names
 

@@ -3,7 +3,7 @@ from __future__ import annotations
 import random
 import re
 from dataclasses import dataclass
-from typing import List
+from typing import List, Optional
 
 
 ROLL_RE = re.compile(
@@ -18,13 +18,14 @@ class RollResult:
     total: int
     rolls: List[int]
     modifier: int
+    reason: Optional[str] = None
 
 
-def roll_dice(expr: str) -> RollResult:
+def roll_dice(expr: str, reason: Optional[str] = None) -> RollResult:
     """
     Parse dice expression like "1d20+3" or "2d6-1" and roll it.
 
-    Returns RollResult(expression, total, rolls, modifier).
+    Returns RollResult(expression, total, rolls, modifier, reason).
     """
     m = ROLL_RE.match(expr)
     if not m:
@@ -37,4 +38,10 @@ def roll_dice(expr: str) -> RollResult:
     rolls = [random.randint(1, sides) for _ in range(num)]
     total = sum(rolls) + mod
 
-    return RollResult(expression=expr.strip(), total=total, rolls=rolls, modifier=mod)
+    return RollResult(
+        expression=expr.strip(),
+        total=total,
+        rolls=rolls,
+        modifier=mod,
+        reason=reason,
+    )

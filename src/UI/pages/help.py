@@ -2,6 +2,13 @@
 from pathlib import Path
 
 import streamlit as st
+from streamlit.errors import StreamlitAPIException
+
+# Page config must be set before any other Streamlit calls.
+try:
+    st.set_page_config(page_title="How to Play / Local DM", layout="wide")
+except StreamlitAPIException:
+    pass
 
 # Make src importable when Streamlit runs this page directly
 ROOT = Path(__file__).resolve().parents[2]
@@ -10,10 +17,20 @@ if str(ROOT) not in sys.path:
 
 from src.game.game_state import get_global_games
 
+# Hide Streamlit's built-in page navigation links (use sidebar buttons instead).
+st.markdown(
+    """
+    <style>
+    [data-testid="stSidebarNav"] { display: none; }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
 
 def get_game_and_world():
     query_params = st.query_params
-    game_id = query_params.get("game_id", "default")
+    game_id = query_params.get("game_id") or st.session_state.get("game_id") or "default"
 
     games = get_global_games()
     game = games.get(game_id)
@@ -24,7 +41,6 @@ def get_game_and_world():
     return game, game.world, game_id
 
 
-st.set_page_config(page_title="How to Play / Local DM", layout="wide")
 st.title("How to Play / Help")
 
 game, world, game_id = get_game_and_world()

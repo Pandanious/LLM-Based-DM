@@ -1,13 +1,30 @@
 import streamlit as st
+from streamlit.errors import StreamlitAPIException
 
 from src.game.game_state import get_global_games
 from src.game.npc_store import load_npcs
+
+# Page config must be set before any other Streamlit calls.
+try:
+    st.set_page_config(page_title="World Information", layout="wide")
+except StreamlitAPIException:
+    pass
+
+# Hide Streamlit's built-in page navigation links (use sidebar buttons instead).
+st.markdown(
+    """
+    <style>
+    [data-testid="stSidebarNav"] { display: none; }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
 
 
 def get_world_from_query():
     """Extract ?game_id=XYZ and fetch world data."""
     query_params = st.query_params
-    game_id = query_params.get("game_id", "default")
+    game_id = query_params.get("game_id") or st.session_state.get("game_id") or "default"
 
     games = get_global_games()
     game = games.get(game_id)
@@ -19,7 +36,6 @@ def get_world_from_query():
     return game, game.world, game_id
 
 
-st.set_page_config(page_title="World Information", layout="wide")
 st.title("World Information")
 
 game, world, game_id = get_world_from_query()

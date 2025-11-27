@@ -18,6 +18,7 @@ from src.game.models import PlayerCharacter
 from src.agent.encounter_build import detect_encounter, encounter_prompt
 from src.UI.mechanics_prompt import refresh_mechanics_prompt
 from src.UI.initiative import current_actor, add_turn_system_message
+import re
 
 
 def _resolve_actor(game: GameState, speaker: str) -> Optional[PlayerCharacter]:
@@ -43,6 +44,20 @@ def _resolve_actor(game: GameState, speaker: str) -> Optional[PlayerCharacter]:
     return None
 
 
+def _derive_world_id(prompt: str, fallback: str) -> str:
+    """
+    Build a stable, filesystem-friendly world_id from the user's prompt.
+    Falls back to the provided fallback (game_id) if the prompt is empty.
+    """
+    if prompt:
+        # keep letters/numbers, replace gaps with dashes, trim repeats, shorten
+        slug = re.sub(r"[^a-zA-Z0-9]+", "-", prompt).strip("-").lower()
+        slug = re.sub(r"-{2,}", "-", slug)[:40].strip("-")
+        if slug:
+            return slug
+    return fallback or "default"
+
+
 def handle_world_creation(user_input: str, game_id: str, game: GameState) -> None:
     """
     Handle the very first input that creates a world.
@@ -55,11 +70,12 @@ def handle_world_creation(user_input: str, game_id: str, game: GameState) -> Non
     game.busy_task = "Forging world..."
     try:
         with st.spinner("Forging world..."):
+            world_id = _derive_world_id(user_input, game_id)
             world = generate_world_state(
-            setting_prompt=user_input,
-            players=st.session_state.get("player_names") or ["Player"],
-            world_id=game_id,
-        )
+                setting_prompt=user_input,
+                players=st.session_state.get("player_names") or ["Player"],
+                world_id=world_id,
+            )
 
         save_world_state(world)
         game.world = world

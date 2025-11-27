@@ -66,7 +66,12 @@ def chat_completion(
 ) -> str:
 
     llm = get_llm()
-    prompt = format_prompt(messages)
+
+    # Trim prompt to fit within context window budget.
+    prompt_budget_chars = max_CTX * 3  # rough heuristic: ~3 chars per token
+    trimmed_messages = _trim_messages(messages, max_chars=prompt_budget_chars)
+
+    prompt = format_prompt(trimmed_messages)
     # Debug: show the prompt in the console
     print("\n=== LLM PROMPT START ===\n")
     print(prompt)
@@ -92,3 +97,32 @@ def chat_completion(
 
 def reset_model():
     get_llm.cache_clear()
+
+
+def _trim_messages(messages: List[Message], max_chars: int) -> List[Message]:
+    """
+    Keep the first system message (if any) plus the most recent messages
+    until we hit a rough character budget. This helps stay under the
+    llama context window without hard token counting.
+    """
+    if len(messages) <= 1:
+        return messages
+
+    system_msgs = [m for m in messages if m.role == "system"]
+    keep_system = system_msgs[:1]  # keep the first system prompt
+
+    # Take recent non-system messages from the end until we exceed budget
+    recent: List[Message] = []
+    total = sum(len(m.content or "") for m in keep_system) + 50 * len(keep_system)
+
+    for msg in reversed(messages):
+        if msg in keep_system:
+            continue
+        approx_len = len(msg.content or "") + 50  # header/prefix fudge factor
+        if total + approx_len > max_chars and recent:
+            break
+        recent.append(msg)
+        total += approx_len
+
+    recent.reverse()
+    return keep_system + recent

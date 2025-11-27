@@ -2,6 +2,13 @@
 from pathlib import Path
 
 import streamlit as st
+from streamlit.errors import StreamlitAPIException
+
+# Page config must be set before any other Streamlit calls.
+try:
+    st.set_page_config(page_title="NPC Overview", layout="wide")
+except StreamlitAPIException:
+    pass
 
 # --- Make src importable ---
 ROOT = Path(__file__).resolve().parents[2]
@@ -12,10 +19,20 @@ from src.game.game_state import get_global_games
 from src.game.npc_store import save_npcs
 from src.agent.item_gen import generate_items_for_character
 
+# Hide Streamlit's built-in page navigation links (use sidebar buttons instead).
+st.markdown(
+    """
+    <style>
+    [data-testid="stSidebarNav"] { display: none; }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
 
 def get_game_and_world():
     query_params = st.query_params
-    game_id = query_params.get("game_id", "default")
+    game_id = query_params.get("game_id") or st.session_state.get("game_id") or "default"
 
     games = get_global_games()
     game = games.get(game_id)
@@ -27,7 +44,6 @@ def get_game_and_world():
     return game, world, game_id
 
 
-st.set_page_config(page_title="NPC Overview", layout="wide")
 st.title("NPC Overview")
 
 game, world, game_id = get_game_and_world()
@@ -81,9 +97,9 @@ for location in sorted(npcs_by_location.keys()):
                 st.markdown(f"> {desc}")
 
             if getattr(npc, "inventory", None):
-                with st.expander("Inventory", expanded=False):
-                    for item in npc.inventory:
-                        st.markdown(f"- {item}")
+                st.markdown("**Inventory:**")
+                for item in npc.inventory:
+                    st.markdown(f"- {item}")
 
             if "merchant" in role_lower or "vendor" in role_lower or "shop" in role_lower:
                 if st.button(f"Refresh stock for {name}", key=f"refresh_{npc.npc_id}"):
