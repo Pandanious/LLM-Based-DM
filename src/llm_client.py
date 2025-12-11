@@ -63,6 +63,7 @@ def chat_completion(
     messages: List[Message],
     temperature: float = default_temp,
     max_tokens: int = default_max_tokens,
+    prefix: str = "",
 ) -> str:
 
     llm = get_llm()
@@ -71,7 +72,8 @@ def chat_completion(
     prompt_budget_chars = max_CTX * 3  # rough heuristic: ~3 chars per token
     trimmed_messages = _trim_messages(messages, max_chars=prompt_budget_chars)
 
-    prompt = format_prompt(trimmed_messages)
+    prompt_body = format_prompt(trimmed_messages)
+    prompt = f"{prefix}\n{prompt_body}" if prefix else prompt_body
     # Debug: show the prompt in the console
     print("\n=== LLM PROMPT START ===\n")
     print(prompt)
@@ -89,8 +91,7 @@ def chat_completion(
 
     choices = result.get("choices", [])
     if not choices:
-        # do something other than crashing
-        return "[DM is silent – no output from model]"
+        return "[DM is silent: no output from model]"
     reply = result["choices"][0].get("text", "")
     return reply.strip()
 
@@ -100,11 +101,8 @@ def reset_model():
 
 
 def _trim_messages(messages: List[Message], max_chars: int) -> List[Message]:
-    """
-    Keep the first system message (if any) plus the most recent messages
-    until we hit a rough character budget. This helps stay under the
-    llama context window without hard token counting.
-    """
+    #keep most recent+more inputs
+    
     if len(messages) <= 1:
         return messages
 

@@ -9,6 +9,8 @@ A local-first Streamlit app that runs a tabletop-style RPG session with your own
 - Play loop: chat with the DM; `/action ...` triggers roll requests, the app rolls with PC stats and logs results.
 - Initiative & turns: build order, step through turns, and export action recaps.
 - Saves: load/save worlds, PCs, NPCs, quests, party summary, and bundle snapshots locally.
+- Retrieval: DM turns pull top snippets from your saved world/NPC/quest data and prepend them as `[CONTEXT]` blocks to stay grounded.
+- Summaries: long chats auto-collapse older turns into a concise `[SUMMARY]` system note to keep within context budget.
 
 ## Why it’s interesting 
 - Fully local: privacy-safe, no external APIs.
@@ -31,6 +33,7 @@ A local-first Streamlit app that runs a tabletop-style RPG session with your own
 ## Tech stack
 - Python, Streamlit, llama-cpp-python
 - Data: JSON saves under `saves/` (worlds, PCs, NPCs, quests, bundles, turn logs)
+- Retrieval layer: keyword search over saved JSON to feed `[CONTEXT]` into the DM prompt; history summarization to trim chat length.
 
 ## Key files
 - `src/UI/streamlit_webapp.py` – main app shell

@@ -1,0 +1,25 @@
+Local RPG Dungeon Master
+
+I built a local-first tabletop RPG assistant that runs entirely on your own machine. It creates rich campaign worlds, NPCs, quests, and items from a simple prompt, then guides players through the adventure with dice-backed decisions and turn-by-turn narration.
+
+What it delivers
+- Instant worldbuilding: turn a short idea into a named setting with lore, locations, themes, and skills.
+- Playable sessions: manage characters, quests, merchants, and encounters while the DM responds in a consistent tone.
+- Fair mechanics: player actions trigger rolls and outcomes are resolved transparently.
+- Session memory: saved games can be reloaded, and long chats are summarized so the story stays focused.
+- Local privacy: everything runs locally - no cloud calls - so creative ideas and play logs stay on your device.
+
+Why it matters
+- Faster prep for game masters and instant adventures for players.
+- Collaborative play: multiple players can share the session state and see turn order and recaps.
+- Reliability: the DM keeps facts straight by grounding responses in the saved world and session notes.
+
+Who it's for
+- Tabletop gamers who want a responsive, consistent digital DM.
+- Creators who want to prototype campaign ideas quickly without relying on online services.
+
+Tech Stack
+- Python app with a Streamlit interface for play controls and chat.
+- Local language model (GGUF via llama.cpp bindings) so all generation runs on-device.
+- JSON saves for worlds, characters, quests, and session notes, enabling reloads and grounded context.
+- Keyword retrieval over your saved data to keep the DM consistent, plus auto-summaries to manage long sessions.
