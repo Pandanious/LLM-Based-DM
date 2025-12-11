@@ -1,6 +1,8 @@
 # Local RPG Dungeon Master
 
-Local-first tabletop RPG assistant: Streamlit UI + on-device GGUF LLM (llama-cpp). Builds worlds, NPCs, quests, items, and runs turn-based sessions with dice-backed actions—no cloud calls or data leaves your machine.
+Local-first tabletop RPG assistant: Streamlit UI + on-device GGUF LLM (llama-cpp). Builds worlds, NPCs, quests, items, and runs turn-based sessions with dice-backed actions - no cloud calls or data leaves your machine.
+
+![CI](https://github.com/Pandanious/LLM-Based-DM/actions/workflows/ci.yaml/badge.svg)
 
 ## Highlights
 - World forge: name + lore + locations + themes + skills from a single prompt, saved by Game ID.
@@ -24,7 +26,7 @@ Local-first tabletop RPG assistant: Streamlit UI + on-device GGUF LLM (llama-cpp
 - Check **Quest Log** for quests and item rewards; **NPC Overview** shows merchants with refreshable stock.
 
 ## Configuration
-- Model path: `src/config.py::model_path` (defaults to `model/Meta-Llama-3.1-8B-Instruct-Q6_K_L.gguf`—swap in your own GGUF).
+- Model path: `src/config.py::model_path` (defaults to `model/Meta-Llama-3.1-8B-Instruct-Q6_K_L.gguf` - swap in your own GGUF).
 - Performance knobs: `cpu_threads`, `gpu_layers`, `default_temp`, `default_max_tokens`.
 - Saves directory: `saves/` (auto-created).
 
@@ -34,18 +36,22 @@ Local-first tabletop RPG assistant: Streamlit UI + on-device GGUF LLM (llama-cpp
 - Retrieval: keyword search over saved JSON to feed `[CONTEXT]` into DM prompt; history summarization trims chat length.
 
 ## Repository map
-- `src/UI/streamlit_webapp.py` — main app shell.
-- `src/UI/pages/` — pages for character manager, quest log, NPC log, world info.
-- `src/agent/world_build.py`, `npc_gen.py`, `quest_gen.py` — generation prompts/parsers.
-- `src/agent/char_gen.py`, `item_gen.py` — character and item generation.
-- `src/game/` — game state, models, dice, save/load.
-- `run_app.bat` — convenience launcher for Streamlit + ngrok.
+- `src/UI/streamlit_webapp.py` - main app shell.
+- `src/UI/pages/` - pages for character manager, quest log, NPC log, world info.
+- `src/agent/world_build.py`, `npc_gen.py`, `quest_gen.py` - generation prompts/parsers.
+- `src/agent/char_gen.py`, `item_gen.py` - character and item generation.
+- `src/game/` - game state, models, dice, save/load.
+- `run_app.bat` - convenience launcher for Streamlit + ngrok.
 
 ## Troubleshooting
 - Model not found: ensure your GGUF file exists and `model_path` points to it.
 - GPU layers: set `gpu_layers=0` to stay CPU-only if you hit GPU issues.
 - Port conflicts: change the Streamlit port via `streamlit run ... --server.port 8502`.
 - Slow responses: lower `default_max_tokens` or increase `cpu_threads` within your hardware limits.
+
+## Tests
+- Tests can be run locally with -m pytest src/test (or run src/tests/run_test.bat (windows))
+- Github Actions runs the same tests on push/pull request. (see badge above)
 
 ## Privacy
 Everything runs locally: no external API calls or data uploads. Your worlds, characters, and logs stay on your device.
