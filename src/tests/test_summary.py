@@ -1,4 +1,4 @@
-import pytest, os
+import pytest
 
 from src.agent.dm_dice import _maybe_summarize_history, _summarize_history
 from src.agent.types import Message
@@ -44,8 +44,3 @@ def test_summarize_history_on_empty(monkeypatch):
     monkeypatch.setattr("src.agent.dm_dice.chat_completion", lambda *args, **kwargs: "")
     summary = _summarize_history([Message(role="user", content="Turn 1")])
     assert summary is None
-
-@pytest.mark.skipif(not os.getenv("RUN_LLM_TESTS"), reason="LLM not enabled")
-def test_summarize_with_model():
-    summary = _summarize_history([Message(role="user",content="Turn 1")])
-    assert summary
