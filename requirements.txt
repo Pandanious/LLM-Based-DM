@@ -2,3 +2,4 @@ llama-cpp-python>=0.2.90
 streamlit>=1.38.0
 python-dotenv
 pydantic
+pytest>=9.0.0
