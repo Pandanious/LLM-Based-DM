@@ -12,6 +12,8 @@ Local-first tabletop RPG assistant: Streamlit UI + on-device GGUF LLM (llama-cpp
 - Saves + retrieval: worlds/PCs/NPCs/quests/turn logs stored under `saves/`; DM responses prepend `[CONTEXT]` snippets from your data to stay grounded.
 - Summaries: long chats auto-collapse into `[SUMMARY]` notes to stay within context budget.
 
+![Architecture](docs/flow.png)
+
 ## Quickstart
 1) Install Python 3.10+ and create a virtualenv.
 2) `pip install -r requirements.txt`
@@ -51,7 +53,8 @@ Local-first tabletop RPG assistant: Streamlit UI + on-device GGUF LLM (llama-cpp
 
 ## Tests
 - Tests can be run locally with -m pytest src/test (or run src/tests/run_test.bat (windows))
-- Github Actions runs the same tests on push/pull request. (see badge above)
+- Github Actions runs the tests on user initiated request through actions. (see badge above)
+- Optional Local test, test 'RUN_LLM_TESTS=1' and run 'python -m pytest .\src\tests\test_local_llm_model.py' to test with model. (Local Model needed)
 
 ## Privacy
 Everything runs locally: no external API calls or data uploads. Your worlds, characters, and logs stay on your device.
