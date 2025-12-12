@@ -12,6 +12,7 @@ Local-first tabletop RPG assistant: Streamlit UI + on-device GGUF LLM (llama-cpp
 - Saves + retrieval: worlds/PCs/NPCs/quests/turn logs stored under `saves/`; DM responses prepend `[CONTEXT]` snippets from your data to stay grounded.
 - Summaries: long chats auto-collapse into `[SUMMARY]` notes to stay within context budget.
 
+## Architecture
 ![Architecture](docs/flow.png)
 
 ## Quickstart
