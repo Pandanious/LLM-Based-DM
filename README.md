@@ -59,3 +59,12 @@ Local-first tabletop RPG assistant: Streamlit UI + on-device GGUF LLM (llama-cpp
 
 ## Privacy
 Everything runs locally: no external API calls or data uploads. Your worlds, characters, and logs stay on your device.
+
+## For reviewers (In German)
+Dieses Projekt entstand als eigenständig entwickeltes Portfolio-Projekt, um lokale LLM-Agenten mit strukturierter Zustandslogik, einfacher RAG-Schicht und einer voll funktionsfähigen Benutzeroberfläche zu demonstrieren. 
+
+Es zeigt insbesondere:
+- Trennung von UI, Agentenlogik und Spielzustand
+- Nutzung eines lokal laufenden GGUF-Modells (llama-cpp-python)
+- Deterministisches, nachvollziehbares Retrieval statt intransparenter Cloud-Aufrufe
+- Tests und GitHub Actions für reproduzierbare Änderungen
