@@ -67,5 +67,29 @@ def test_build_corpus_bad_json(tmp_path: Path):
     assert any("Quest" in t and "Bob" in t for t in texts)
 
 
+def test_turn_notes_indexed(tmp_path: Path):
+    bundle = {
+        "turn_log": {"entries": [{"content": "Found secret door in the cellar."}]},
+    }
+    (tmp_path / "bundle.json").write_text(json.dumps(bundle), encoding="utf-8")
+
+    snippets = build_corpus(tmp_path)
+    assert any("secret door" in text for _, text in snippets)
+
+
+def test_context_blocks_include_top_hit(tmp_path: Path):
+    bundle = {
+        "world": {"world_summary": "Sky traders at the docks"},
+        "npcs": {"npc1": {"name": "Aerin", "description": "sells sky maps", "location": "Dockside"}},
+    }
+    (tmp_path / "bundle.json").write_text(json.dumps(bundle), encoding="utf-8")
+
+    snippets = build_corpus(tmp_path)
+    hits = search_snippets("sky maps dock", snippets, top_k=2)
+    ctx = format_context_blocks(hits)
+
+    assert "[CONTEXT 1]" in ctx
+    assert "sky maps" in ctx or "Sky traders" in ctx
+
 
 

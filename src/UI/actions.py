@@ -143,6 +143,7 @@ def handle_gameplay_input(user_input: str, game: GameState, speaker: str) -> Non
                 "We are ready to begin. "
                 f"Introduce {pc.name}, a level {pc.level} "
                 f"{pc.ancestry} {pc.archetype}, and describe the opening scene."
+                "Do not invent new player characters."
             )
         else:
             user_input = (
@@ -173,6 +174,15 @@ def handle_gameplay_input(user_input: str, game: GameState, speaker: str) -> Non
                     "Opening scene guidance: explicitly mention the whole party "
                     f"({party_text}) and state whose turn it is ({turn_label}). "
                     "Then describe the scene."
+                ),
+            )
+        )
+        game.messages.append(
+            Message(
+                role="system",
+                content=(
+                    "Do not create or rename player characters. "
+                    "Use only the provided PARTY SUMMARY for the party roster."
                 ),
             )
         )
