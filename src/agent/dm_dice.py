@@ -28,11 +28,27 @@ ROLL_REQUEST_RE = re.compile(
     r"\[ROLL_REQUEST:\s*(?P<expr>.+?)\s*\|\s*(?P<reason>.+?)\s*\]")
 
 SUMMARY_SYSTEM_PROMPT = (
-    "You are a session scribe. Summarize the prior turns into concise notes. "
-    "Keep NPC names, locations, items, quests, decisions, and unresolved hooks. "
-    "Keep mechanical outcomes if important (success/fail, damage). "
+    "You are a session scribe. Summarize prior turns into concise notes. Keep NPC names, locations, items, quests, decisions, and unresolved hooks.\n"
     "Do not invent facts. Limit to ~180 words."
 )
+
+NO_CONTEXT_GUARD = (
+    "[SYSTEM]\n"
+    "No context retrieved. If you lack facts, reply with \"I do not know.\""
+    "Do not invent characters, items, locations or outcomes.\n "
+)
+
+CONTEXT_GUARD = (
+    "[SYSTEM]\n"
+    "Use only the provided CONTEXT and prior system/roll messages.\n"
+    "Do not invent characters, items, locations or outcomes.\n "
+    "Stay in the current/scene/location/time from CONTEXT/state; do not jump elsewhere unless the player moves somehwere explicitly.\n"
+    "Do not grant or remove items or complete or advance quests unless stated in CONTEXT or by system/roll messages.\n"
+    "Use only PCs/NPCs listen in CONTEXT. If a character is not listed, ask for clarification."
+    "If a fact is missing, say you do not know.\n"
+)
+
+
 
 _CORPUS = None
 
@@ -93,25 +109,17 @@ def _maybe_summarize_history(messages: List[Message], limit: int = 60, keep_rece
 def _build_context_prefix(messages: List[Message], top_k: int = 5):
     corpus = _get_corpus()
     if not corpus:
-        return (
-            "[SYSTEM]\nUse only provided context; if none, say you don't know. "
-            "Do not invent new facts.\n"
-        )
+        return NO_CONTEXT_GUARD
 
     last_user = next((m for m in reversed(messages) if m.role == "user"), None)
     query = last_user.content if last_user else ""
     hits = search_snippets(query, corpus, top_k=top_k)
     if not hits:
-        return (
-            "[SYSTEM]\nUse only provided context; if none, say you don't know. "
-            "Do not invent new facts.\n"
-        )
+        return NO_CONTEXT_GUARD
+    
     context_block = format_context_blocks(hits)
-    guard = (
-        "[SYSTEM]\nUse the CONTEXT facts; if missing, say you don't know. "
-        "Do not invent new facts.\n"
-    )
-    return f"{context_block}\n{guard}"
+    
+    return f"{context_block}\n{CONTEXT_GUARD}"
 
 
 def parse_roll_request(text: str):
@@ -255,3 +263,9 @@ def dm_turn_with_dice(messages: List[Message], player_characters: Dict[str, Play
     messages.append(outcome_message)
 
     return messages
+
+def refresh_corpus():
+    global _CORPUS
+    _CORPUS = build_corpus()
+
+

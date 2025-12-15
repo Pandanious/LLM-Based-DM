@@ -43,14 +43,11 @@ def test_search_snippet_matches(tmp_path: Path):
     assert hits == []
 
 def test_format_block_number_hits():
-    hits = [
-        ("id1", "First snippet", 2.0),
-        ("id2", "Second snippet", 1.0),
-    ]
+    hits = [("id1", "First snippet", 2.0),("id2", "Second snippet", 1.0)]
     ctx = format_context_blocks(hits)
-    assert "[CONTEXT 1]" in ctx and "First snippet" in ctx
-    assert "[CONTEXT 2]" in ctx and "Second snippet" in ctx
-
+    assert "[CONTEXT 1 | id1]" in ctx and "First snippet" in ctx
+    assert "[CONTEXT 2 | id2]" in ctx and "Second snippet" in ctx
+    assert "First snippet" in ctx and "Second snippet" in ctx
 
 def test_build_corpus_bad_json(tmp_path: Path):
     # What if the json is messed up ?
@@ -88,8 +85,20 @@ def test_context_blocks_include_top_hit(tmp_path: Path):
     hits = search_snippets("sky maps dock", snippets, top_k=2)
     ctx = format_context_blocks(hits)
 
-    assert "[CONTEXT 1]" in ctx
+    assert "[CONTEXT 1 | npc:Aerin]" in ctx
     assert "sky maps" in ctx or "Sky traders" in ctx
+
+def test_search_phrase_bigram():
+    # the bigram-phrase match should win
+
+    snippets = [("s1","the sky docks trader waits by the gate"),("s2","sky city port trader elsewhere")]
+    hits = search_snippets("sky docks trader", snippets, top_k=2)
+    assert any ("sky docks" in h[1] for h in hits)     
+
+def test_search_blank_querry_corpus():
+    snippets = [("s1","foo"),("s2","bar")]
+    assert search_snippets("",snippets) == []
+    assert search_snippets("foo", []) == []
 
 
 

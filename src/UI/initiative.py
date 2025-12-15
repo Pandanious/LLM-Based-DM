@@ -6,6 +6,7 @@ from src.agent.types import Message
 from src.game.game_state import GameState
 from src.game.turn_store import load_turn_log, begin_turn, save_turn_log
 from src.UI.mechanics_prompt import refresh_mechanics_prompt
+from src.agent.dm_dice import refresh_corpus
 
 
 def rebuild_initiative_order(game: GameState):
@@ -17,6 +18,8 @@ def rebuild_initiative_order(game: GameState):
     )
     game.initiative_order = [pc.pc_id for pc in ordered]
     game.active_turn_index = 0 if game.initiative_order else 0
+    refresh_corpus()
+
 
 
 def current_actor(game: GameState):
@@ -117,3 +120,4 @@ def render_initiative_controls(game: GameState):
             if game.player_characters.get(pc_id)
         ]
         st.caption(f"Order: {', '.join(order_names)}")
+        

@@ -79,5 +79,4 @@ def refresh_mechanics_prompt(game: GameState):
         if not (m.role == "system" and "[MECHANICS]" in m.content)
     ]
     game.messages.append(
-        Message(role="system", content=build_mechanics_prompt(game))
-    )
+        Message(role="system", content=build_mechanics_prompt(game)))

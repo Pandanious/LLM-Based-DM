@@ -14,14 +14,14 @@ from pathlib import Path
 
 @dataclass
 class llm_gen_stat():
-    count = 0
-    errors = 0
-    total_time_seconds = 0.0
-    max_time_seconds = 0.0
-    last_time_seconds = 0.0
-    peak_memory_GB = None
-    last_memory_GB = None
-    last_delta_memory_GB = None
+    count: int= 0
+    errors: int = 0
+    total_time_seconds: float = 0.0
+    max_time_seconds: float = 0.0
+    last_time_seconds: float = 0.0
+    peak_memory_GB: Optional[float] = None
+    last_memory_GB: Optional[float] = None
+    last_delta_memory_GB: Optional[float] = None
 
 
 class metricsreg():
