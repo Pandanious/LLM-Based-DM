@@ -1,16 +1,26 @@
 # Local RPG Dungeon Master
 
-Local-first tabletop RPG assistant: Streamlit UI + on-device GGUF LLM (llama-cpp). Builds worlds, NPCs, quests, items, and runs turn-based sessions with dice-backed actions - no cloud calls or data leaves your machine.
+This is a table top role playing game dungeon master. It takes care of generation of the World, NPCs, Quests. The DM can generate items for ones inventory such as weapons, armor etc. Dice roll mechanics have been set up which govern specific actions. This project is to showcase the constrained usage of the local llm model, which is being constrained and molded into functioning without causing the common issues notices in quantized local models.
+
 
 ![CI](https://github.com/Pandanious/LLM-Based-DM/actions/workflows/ci.yaml/badge.svg)
 
-## Highlights
-- World forge: name + lore + locations + themes + skills from a single prompt, saved by Game ID.
-- NPCs, quests, merchants: location-tied NPCs, quests with rewards, merchants with refreshable stock.
-- Play loop: chat with the DM; `/action ...` triggers rolls with PC stats; logs outcomes.
-- Initiative + turns: build order, step through turns, and export recaps.
-- Saves + retrieval: worlds/PCs/NPCs/quests/turn logs stored under `saves/`; DM responses prepend `[CONTEXT]` snippets from your data to stay grounded.
-- Summaries: long chats auto-collapse into `[SUMMARY]` notes to stay within context budget.
+
+
+
+## Game Flow
+- To start the game after running the bat file, you will have to enter a Game ID. This will help users sync their session (if you have multiple people connecting over the internet).
+- You should write the player using the terminal, this will help set your player's name.
+- Frist prompt is world generation. You are free to input whatever, but remember the limitations of the local model you are using. (Not every model can behave like Chat-GPT)
+- This starts the generation of the world, then NPC to populate the world and quests.
+- Use the character manager button to open the manager. Within it fill the details to generate your character. Recommendation: Try not being too obtuse as the model will just fail in the generation of the item.
+- The character gen should be loaded using the button below and then towards the end of the page, click the generate character button. (This was done to prevent the OOM scenario with multiple people trying to generate their characters at the same time. If multiple people use the same terminal it will form a queue and process it FIFO)
+- Once character is generated, go back to the main page and click on the "Refresh Party Summary" and then "Build Initiative Order". These two should load your character and assign an initiave so that the LLM knows whose turn is next.
+- Start the session with a generic "Lets start" or something similar.
+- Make sure to click next turn after every prompt you enter, that moves the game further and helps the llm keep track of the turn.
+- Actions such as 'stealth' 'shoot' 'attack' etc have to be performed with "/action I sneak around a guard". If this is not followed, the DM will not be able to run dice throws for the scenario.
+- Use the save buttons to save the generated world and other items. These will be saved in a folder called 'saves' in the project directorty. You can use these to continue off from a paused campaign.
+
 
 ## Architecture
 ![Architecture](docs/flow.png)
@@ -22,21 +32,16 @@ Local-first tabletop RPG assistant: Streamlit UI + on-device GGUF LLM (llama-cpp
 4) Run: `streamlit run src/UI/streamlit_webapp.py` (or use `run_app.bat` on Windows).
 5) In the sidebar: choose a Game ID, add player names, click **Reset Game** if needed, then describe your world to begin.
 
-## Demo path
-- Generate a world with a short setting description.
-- Open **Character Manager** to create PCs for each player.
-- Back on the main page: **Refresh Party Summary**, **Build Initiative** (if multiple players), type `start`, then chat. Use `/action ...` for mechanics.
-- Check **Quest Log** for quests and item rewards; **NPC Overview** shows merchants with refreshable stock.
+## Tech stack
+- Python, Streamlit, llama-cpp-python.
+- Data: JSON saves under `saves/` for worlds, PCs, NPCs, quests, bundles, turn logs.
+- Retrieval: keyword search over saved JSON to feed `[CONTEXT]` into DM prompt; history summarization trims chat length.
 
 ## Configuration
 - Model path: `src/config.py::model_path` (defaults to `model/Meta-Llama-3.1-8B-Instruct-Q6_K_L.gguf` - swap in your own GGUF).
 - Performance knobs: `cpu_threads`, `gpu_layers`, `default_temp`, `default_max_tokens`.
 - Saves directory: `saves/` (auto-created).
 
-## Tech stack
-- Python, Streamlit, llama-cpp-python.
-- Data: JSON saves under `saves/` for worlds, PCs, NPCs, quests, bundles, turn logs.
-- Retrieval: keyword search over saved JSON to feed `[CONTEXT]` into DM prompt; history summarization trims chat length.
 
 ## Repository map
 - `src/UI/streamlit_webapp.py` - main app shell.
@@ -57,8 +62,6 @@ Local-first tabletop RPG assistant: Streamlit UI + on-device GGUF LLM (llama-cpp
 - Github Actions runs the tests on user initiated request through actions. (see badge above)
 - Optional Local test, test 'RUN_LLM_TESTS=1' and run 'python -m pytest .\src\tests\test_local_llm_model.py' to test with model. (Local Model needed)
 
-## Privacy
-Everything runs locally: no external API calls or data uploads. Your worlds, characters, and logs stay on your device.
 
 ## For reviewers (In German)
 Dieses Projekt entstand als eigenständig entwickeltes Portfolio-Projekt, um lokale LLM-Agenten mit strukturierter Zustandslogik, einfacher RAG-Schicht und einer voll funktionsfähigen Benutzeroberfläche zu demonstrieren. 

@@ -6,7 +6,7 @@ from typing import Dict, Optional
 
 
 class CommandKind(str, Enum):
-    """High-level category of a parsed command."""
+    #"""High-level category of a parsed command."""
     MECHANICAL = "mechanical"  # <-  game mechanics
     META = "meta"              # <-  out-of-character or system commands
     

@@ -4,6 +4,26 @@ from typing import List
 from src.metrics.metrics import track_gen,metrics
 
 
+
+# metrics reporting
+
+class withmetrics:
+    def __init__(self, llm, default_name="llm_call"):
+        self.llm = llm
+        self.default = default_name
+    
+    def __call__(self, *args, metric_name=None, **kwargs):
+        name = metric_name or self.default
+        kwargs.pop("metric_name",None)
+        with track_gen(name):
+            result = self.llm(*args,**kwargs)
+        metrics.increment(f"llm_calls.{name}")
+        metrics.increment("llm_calls_total")
+        return result
+    
+    def __getattr__(self, item):
+        return getattr(self.llm, item)
+
 # Ensure CUDA/ggml DLLs are discoverable when llama_cpp loads.
 _dll_dirs = (
     r"H:\CUDA\bin",
@@ -34,13 +54,9 @@ from src.config import (
 @lru_cache(maxsize=1)
 def get_llm():
     """Load and cache the Llama model."""
-    return Llama(
-        model_path=str(model_path),
-        n_ctx=max_CTX,
-        n_threads=cpu_threads,
-        n_gpu_layers=gpu_layers,
-        verbose=True,  # set to True for terminal logs, False if too noisy
-    )
+
+    config = Llama(model_path=str(model_path), n_ctx=max_CTX, n_threads=cpu_threads, n_gpu_layers=gpu_layers, verbose=False)
+    return withmetrics(config,default_name='llm_call') 
 
 
 def format_prompt(messages: List[Message]):
@@ -76,7 +92,7 @@ def chat_completion(
     prompt = f"{prefix}\n{prompt_body}" if prefix else prompt_body
     # Debug: show the prompt in the console
     #print("\n=== LLM PROMPT START ===\n")
-    '''
+    
     result = llm(
         prompt,
         max_tokens=max_tokens,
@@ -85,21 +101,8 @@ def chat_completion(
         top_k=40,
         repeat_penalty=1.1,
         # Stop the model as soon as it tries to start a new turn or switch speaker
-        stop=["[PLAYER", "[ASSISTANT", "[SYSTEM", "[ITEM", "</s>"],)
-    '''
-    with track_gen("LLM_CHAT"):
-        result = llm(
-        prompt,
-        max_tokens=max_tokens,
-        temperature=temperature,
-        top_p=0.9,
-        top_k=40,
-        repeat_penalty=1.1,
-        # Stop the model as soon as it tries to start a new turn or switch speaker
-        stop=["[PLAYER", "[ASSISTANT", "[SYSTEM", "[ITEM", "</s>"],)
-
-    metrics.increment("llm_calls",1)
-
+        stop=["[PLAYER", "[ASSISTANT", "[SYSTEM", "[ITEM", "</s>"])
+    
     choices = result.get("choices", [])
     if not choices:
         return "[DM is silent: no output from model]"
@@ -135,3 +138,7 @@ def _trim_messages(messages: List[Message], max_chars: int):
 
     recent.reverse()
     return keep_system + recent
+
+
+    
+

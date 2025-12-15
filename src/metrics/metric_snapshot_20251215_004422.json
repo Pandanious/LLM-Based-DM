@@ -1,0 +1,10 @@
+{
+  "Generations": {
+    "llm_call": {}
+  },
+  "Counters": {
+    "llm_calls.llm_call": 27,
+    "llm_calls_total": 27
+  },
+  "Process Memory in GB": 6.66
+}
