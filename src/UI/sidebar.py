@@ -9,16 +9,8 @@ from typing import Dict, Tuple
 
 
 def render_sidebar(
-    games: Dict[str, GameState],
-) -> Tuple[GameState, str, str, bool, st.delta_generator.DeltaGenerator]:
-    """
-    Render the entire sidebar and return:
-      - game: GameState for current ID
-      - game_id: current Game ID
-      - players_raw: raw CSV string of player names
-      - startbutton: whether reset button was pressed
-      - initiative_sidebar: container to render initiative controls into
-    """
+    games: Dict[str, GameState]):
+   
     with st.sidebar:
         st.subheader("Game / Table")
 
@@ -110,7 +102,7 @@ def render_sidebar(
                 height=0,
             )
 
-        # Placeholder for initiative controls (rendered later)
+        # initiative controls (rendered later)
         initiative_sidebar = st.container()
 
     return game, game_id, players_raw, startbutton, initiative_sidebar

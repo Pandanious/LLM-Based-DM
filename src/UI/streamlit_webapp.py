@@ -7,7 +7,8 @@ if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))
 
 import streamlit as st
-
+import signal
+from src.metrics.metrics import metrics
 from src.UI.game_state import get_games, reset_game
 from src.UI.sidebar import render_sidebar
 from src.UI.actions import handle_world_creation, handle_gameplay_input
@@ -19,6 +20,7 @@ from src.agent.party_summary import build_party_summary
 from src.game.party_store import save_party_summary
 from src.game.turn_store import build_action_summary, export_turn_log_snapshot
 
+metrics.exit_writer()
 
 # ---------------------------------------
 # UI SETTINGS & CSS

@@ -7,10 +7,10 @@ from src.game.game_state import GameState
 CHAT_REFRESH_SECONDS = 2.5
 
 
-def render_chat_log(game: GameState) -> None:
-    """
-    Render the game log, scroll button, and speaker selector.
-    """
+def render_chat_log(game: GameState):
+    
+    #Render the game log, scroll button, and speaker selector
+    
     st.subheader("Game Log")
     st.caption("Chat auto-refreshes so everyone sees the latest messages; scroll button is still available.")
 

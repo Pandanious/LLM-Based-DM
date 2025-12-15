@@ -35,19 +35,19 @@ SKILL_KEYWORDS: Dict[str, List[str]] = {
     "damage_heavy": ["weapon", "combat", "heavy"],
 }
 
-# Simple static proficiency bonus for “has the right skill”
+# Simple static proficiency bonus for "has the right skill"
 DEFAULT_PROF_BONUS = 2
 
 
-def ability_mod(stat_value: int) -> int:
+def ability_mod(stat_value: int):
     """
-    Convert a 3–18 stat score to a D&D-ish modifier, including negatives.
+    Convert a 3-18 stat score to a D&D-ish modifier, including negatives.
     Example: 8 -> -1, 10 -> 0, 14 -> +2, 18 -> +4.
     """
     return (stat_value - 10) // 2
 
 
-def _get_primary_ability_mod(pc: PlayerCharacter, action_type: str) -> int:
+def _get_primary_ability_mod(pc: PlayerCharacter, action_type: str):
     stats = pc.stats or {}
     # Default to 10 if missing
     str_mod = ability_mod(stats.get("STR", 10))
@@ -73,10 +73,10 @@ def _get_primary_ability_mod(pc: PlayerCharacter, action_type: str) -> int:
     return max(str_mod, dex_mod, int_mod, wis_mod, cha_mod)
 
 
-def _skill_bonus(pc: PlayerCharacter, action_type: str) -> int:
-    """
-    +DEFAULT_PROF_BONUS if any of the PC's skills match SKILL_KEYWORDS[action_type].
-    """
+def _skill_bonus(pc: PlayerCharacter, action_type: str):
+
+    # +DEFAULT_PROF_BONUS PC's skills match SKILL_KEYWORDS[action_type].
+    
     keywords = SKILL_KEYWORDS.get(action_type)
     if not keywords:
         return 0
@@ -91,7 +91,7 @@ def _skill_bonus(pc: PlayerCharacter, action_type: str) -> int:
     return 0
 
 
-def _difficulty_adjustment(reason: str) -> int:
+def _difficulty_adjustment(reason: str):
     """
     Very simple difficulty parser:
     - "very hard" / "extremely" -> -4
@@ -111,14 +111,10 @@ def _difficulty_adjustment(reason: str) -> int:
 def compute_action_modifier(
     pc: Optional[PlayerCharacter],
     action_type: str,
-    reason: str,
-) -> int:
-    """
-    Compute the total modifier for a given action:
-    ability_mod + skill_prof + difficulty_adjustment.
-
-    If pc is None (no matching character), returns 0 so it still works.
-    """
+    reason: str,):
+    
+    #Compute the total modifier for a given action
+    
     if pc is None:
         return 0
 
@@ -132,14 +128,8 @@ def compute_action_modifier(
 def evaluate_check(
     total: int,
     action_type: str,
-    reason: str,
-) -> Tuple[Optional[int], Optional[str]]:
-    """
-    Suggest a DC and classify success/failure for *check-type* actions.
-    Damage rolls generally don't need DC / outcome classification.
-
-    Returns (dc, outcome) where outcome is "success" / "failure" / None.
-    """
+    reason: str,):
+   
     if action_type in {"damage_light", "damage_heavy"}:
         return None, None
 

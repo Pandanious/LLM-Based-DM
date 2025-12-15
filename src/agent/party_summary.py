@@ -2,7 +2,7 @@ from typing import Dict
 from src.game.models import PlayerCharacter
 
 
-def build_party_summary(pcs: Dict[str, PlayerCharacter]) -> str:
+def build_party_summary(pcs: Dict[str, PlayerCharacter]):
     
     if not pcs:
         return ""

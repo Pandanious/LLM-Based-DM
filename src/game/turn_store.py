@@ -37,7 +37,7 @@ class TurnLog:
     current_actor_id: Optional[str] = None
     entries: List[TurnEntry] = field(default_factory=list)
 
-    def to_dict(self) -> Dict:
+    def to_dict(self):
         return {
             "world_id": self.world_id,
             "turn_count": self.turn_count,
@@ -46,7 +46,7 @@ class TurnLog:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict) -> "TurnLog":
+    def from_dict(cls, data: Dict):
         entries = [
             TurnEntry(
                 turn_number=e.get("turn_number", 0),
@@ -77,13 +77,13 @@ class TurnLog:
         )
 
 
-def _turns_path(world_id: str) -> Path:
+def _turns_path(world_id: str):
     Path("saves").mkdir(exist_ok=True)
     Path("saves/turns").mkdir(exist_ok=True)
     return Path("saves/turns") / f"{world_id}_turns.json"
 
 
-def load_turn_log(world_id: str) -> TurnLog:
+def load_turn_log(world_id: str):
     path = _turns_path(world_id)
     if not path.exists():
         return TurnLog(world_id=world_id)
@@ -91,13 +91,13 @@ def load_turn_log(world_id: str) -> TurnLog:
     return TurnLog.from_dict(data)
 
 
-def save_turn_log(turn_log: TurnLog) -> Path:
+def save_turn_log(turn_log: TurnLog):
     path = _turns_path(turn_log.world_id)
     path.write_text(json.dumps(turn_log.to_dict(), indent=2), encoding="utf-8")
     return path
 
 
-def begin_turn(turn_log: TurnLog, actor: Optional[PlayerCharacter]) -> TurnLog:
+def begin_turn(turn_log: TurnLog, actor: Optional[PlayerCharacter]):
     turn_log.turn_count += 1
     turn_log.current_actor_id = actor.pc_id if actor else None
     entry = TurnEntry(
@@ -111,7 +111,7 @@ def begin_turn(turn_log: TurnLog, actor: Optional[PlayerCharacter]) -> TurnLog:
     return turn_log
 
 
-def add_turn_note(turn_log: TurnLog, note: str, options: Optional[List[str]] = None) -> TurnLog:
+def add_turn_note(turn_log: TurnLog, note: str, options: Optional[List[str]] = None):
     if not turn_log.entries:
         return turn_log
     entry = turn_log.entries[-1]
@@ -127,11 +127,8 @@ def add_turn_action(
     player_name: str,
     actor: Optional[PlayerCharacter],
     content: str,
-    tags: Optional[List[str]] = None,
-) -> TurnLog:
-    """
-    Attach a structured action record to the most recent turn.
-    """
+    tags: Optional[List[str]] = None):
+    
     if not turn_log.entries:
         return turn_log
 
@@ -151,12 +148,8 @@ def build_action_summary(
     turn_log: TurnLog,
     limit: int = 12,
     encounter_summary: Optional[str] = None,
-    encounter_history: Optional[List[str]] = None,
-) -> str:
-    """
-    Produce a compact human-readable summary of the latest actions,
-    with optional encounter context.
-    """
+    encounter_history: Optional[List[str]] = None):
+    
     lines: List[str] = []
     if encounter_summary:
         lines.append(f"Active encounter: {encounter_summary}")
@@ -186,10 +179,8 @@ def build_action_summary(
     return "\n".join(lines)
 
 
-def export_turn_log_snapshot(turn_log: TurnLog, summary_text: Optional[str] = None) -> tuple[Path, Path]:
-    """
-    Persist the turn log plus a text summary into a timestamped snapshot folder.
-    """
+def export_turn_log_snapshot(turn_log: TurnLog, summary_text: Optional[str] = None):
+    
     timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
     export_root = Path("saves") / "snapshots" / f"{turn_log.world_id}_actions"
     export_root.mkdir(parents=True, exist_ok=True)

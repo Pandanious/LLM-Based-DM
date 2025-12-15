@@ -23,7 +23,7 @@ class GameState:
     busy_task: Optional[str] = None  # what is running
 
 @lru_cache(maxsize=1)
-def get_global_games() -> Dict[str, GameState]:
+def get_global_games():
     
     # Global dictionary of all active games, keyed by game_id.Because of @lru_cache, this dict is created once 
     # per Python process and reused across all Streamlit sessions. That makes it shared state.

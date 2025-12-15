@@ -13,8 +13,7 @@ def _pc():
         concept="sneaky",
         stats={"STR": 8, "DEX": 14, "INT": 12},
         max_hp=10,
-        current_hp=10,
-    )
+        current_hp=10)
 
 def test_compute_action_modifier_uses_stats():
     pc = _pc()

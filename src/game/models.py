@@ -25,7 +25,7 @@ class World_State:
     # list of theme/tone bullet strings
     themes: List[str] = field(default_factory=list)
 
-    def to_dict(self) -> dict:
+    def to_dict(self):
         data = asdict(self)
         if isinstance(self.created_on, datetime):
             data["created_on"] = self.created_on.isoformat()
@@ -34,7 +34,7 @@ class World_State:
         return data
 
     @classmethod
-    def from_dict(cls, data: dict) -> "World_State":
+    def from_dict(cls, data: dict):
         created_raw = data.get("created_on")
         last_raw = data.get("last_played")
 
@@ -89,7 +89,7 @@ class PlayerCharacter:
     last_updated: Optional[datetime] = None
     
 
-    def to_dict(self) -> dict:
+    def to_dict(self):
         data = asdict(self)
         if isinstance(self.created_on, datetime):
             data["created_on"] = self.created_on.isoformat()
@@ -98,7 +98,7 @@ class PlayerCharacter:
         return data
 
     @classmethod
-    def from_dict(cls, data: dict) -> "PlayerCharacter":
+    def from_dict(cls, data: dict):
         created_raw = data.get("created_on")
         updated_raw = data.get("last_updated")
 
@@ -152,7 +152,7 @@ class NPC:
     created_on: datetime = field(default_factory=datetime.utcnow)
     last_updated: Optional[datetime] = None
 
-    def to_dict(self) -> dict:
+    def to_dict(self):
         data = asdict(self)
         if isinstance(self.created_on, datetime):
             data["created_on"] = self.created_on.isoformat()
@@ -161,7 +161,7 @@ class NPC:
         return data
     
     @classmethod
-    def from_dict(cls, data: dict) -> "NPC":
+    def from_dict(cls, data: dict):
         created_raw = data.get("created_on")
         updated_raw = data.get("last_updated")
 
@@ -212,7 +212,7 @@ class Quest:
     created_on: datetime = field(default_factory=datetime.utcnow)
     last_updated: Optional[datetime] = None
 
-    def to_dict(self) -> dict:
+    def to_dict(self):
         data = asdict(self)
         if isinstance(self.created_on, datetime):
             data["created_on"] = self.created_on.isoformat()
@@ -221,7 +221,7 @@ class Quest:
         return data
 
     @classmethod
-    def from_dict(cls, data: dict) -> "Quest":
+    def from_dict(cls, data: dict):
         created_raw = data.get("created_on")
         updated_raw = data.get("last_updated")
 
@@ -265,7 +265,7 @@ class Item:
     created_on: datetime = field(default_factory=datetime.utcnow)
     last_updated: Optional[datetime] = None
 
-    def to_dict(self) -> dict:
+    def to_dict(self):
         data = asdict(self)
         if isinstance(self.created_on, datetime):
             data["created_on"] = self.created_on.isoformat()
@@ -274,7 +274,7 @@ class Item:
         return data
 
     @classmethod
-    def from_dict(cls, data: dict) -> "Item":
+    def from_dict(cls, data: dict):
         created_raw = data.get("created_on")
         updated_raw = data.get("last_updated")
         item_properties = list(data.get("item_properties", []))

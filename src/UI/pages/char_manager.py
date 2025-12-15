@@ -41,7 +41,7 @@ def get_game_and_world():
     return game, world, game_id
 
 
-def render_character_card(pc) -> None:
+def render_character_card(pc):
     # Show a character sheet in a collapsible card.
     with st.expander(f"{pc.name} ({pc.player_name}) - Level {pc.level}"):
         st.markdown(f"**Concept:** {pc.concept}")

@@ -7,11 +7,10 @@ from src.agent.types import Message
 from src.game.quest_store import save_quests
 
 
-def handle_quest_command(raw: str, game: Any) -> bool:
-    """
-    Handle quest-related slash commands.
-    Returns True if the command was handled and should NOT be sent to the DM.
-    """
+def handle_quest_command(raw: str, game: Any):
+    
+    # Handle quest-related slash commands.
+    
     if not raw.strip().lower().startswith("/quest"):
         return False
 
@@ -28,7 +27,7 @@ def handle_quest_command(raw: str, game: Any) -> bool:
 
     quests = getattr(game, "quests", {}) or {}
 
-    def add_system_message(text: str) -> None:
+    def add_system_message(text: str):
         game.messages.append(
             Message(
                 role="system",
@@ -37,7 +36,7 @@ def handle_quest_command(raw: str, game: Any) -> bool:
             )
         )
 
-    # /quest list
+    
     if sub == "list":
         if not quests:
             add_system_message("[QUEST LIST] No quests available for this world.")

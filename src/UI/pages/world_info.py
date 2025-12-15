@@ -63,7 +63,7 @@ for loc in world.major_locations:
 st.markdown("---")
 st.subheader("Minor Locations")
 for loc in world.minor_locations:
-    st.markdown(f"- **{loc['name']}** — {loc['description']}")
+    st.markdown(f"- **{loc['name']}** - {loc['description']}")
 
 st.markdown("---")
 st.subheader("World Lore")
@@ -83,7 +83,7 @@ if not game.npcs:
     st.info("No NPCs have been generated yet for this world.")
 else:
     for npc_id, npc in game.npcs.items():
-        with st.expander(f"{npc.name} ({npc.role}) — {npc.location}"):
+        with st.expander(f"{npc.name} ({npc.role}) - {npc.location}"):
             st.markdown(f"**Attitude:** {npc.attitude}")
             if npc.tags:
                 st.markdown("**Tags:** " + ", ".join(npc.tags))

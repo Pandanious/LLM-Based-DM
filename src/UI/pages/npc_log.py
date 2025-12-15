@@ -86,13 +86,13 @@ for location in sorted(npcs_by_location.keys()):
             role_lower = str(role).lower()
             highlight = ""
             if "merchant" in role_lower:
-                highlight = " 🛒"
+                highlight = " Merchant"
             elif "leader" in role_lower:
-                highlight = " ⭐"
+                highlight = " Faction Leader"
             elif "quest" in role_lower:
-                highlight = " 📜"
+                highlight = " Quest NPC"
 
-            st.markdown(f"**{name}** — {role}{highlight}")
+            st.markdown(f"**{name}** - {role}{highlight}")
             if desc:
                 st.markdown(f"> {desc}")
 

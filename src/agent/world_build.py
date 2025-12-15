@@ -24,7 +24,7 @@ Include:
 
 LORE:
 
-Write 3–5 paragraphs of deeper worldbuilding.
+Write 3-5 paragraphs of deeper worldbuilding.
 Include:
 - major cultures or civilizations
 - important regions and landmarks
@@ -75,11 +75,10 @@ Write all text in a consistent, friendly, descriptive TTRPG tone.
 """)
 
 
-def generate_world_state(setting_prompt: str, players: List[str], world_id: str = "default") -> World_State:
-    """
-    Ask the LLM to invent a world (summary, lore, skills) for the given setting + players.
-    Returns a World_State object.
-    """
+def generate_world_state(setting_prompt: str, players: List[str], world_id: str = "default"):
+    
+    # Ask the LLM to invent a world (summary, lore, skills) for the given setting + players.
+    
     llm = get_llm()
 
     prompt = WORLD_GEN_PROMPT_TEMPLATE.format(
@@ -128,11 +127,10 @@ def generate_world_state(setting_prompt: str, players: List[str], world_id: str 
     return world
 
 
-def _infer_title_from_summary(world_summary: str, fallback_setting: str) -> str:
-    """
-    Derive a campaign title from the summary text.
-    Gemma sometimes echoes templates; we ignore obvious junk.
-    """
+def _infer_title_from_summary(world_summary: str, fallback_setting: str):
+    
+   # Derive a campaign title from the summary text.
+    
     s = world_summary.strip()
 
     # Strip simple headers
@@ -156,7 +154,7 @@ def _infer_title_from_summary(world_summary: str, fallback_setting: str) -> str:
             title = s[:60].strip()
 
     if not title:
-        # fallback to setting prompt truncated
+        # fallback to setting prompt 
         fallback = fallback_setting.strip()
         if not fallback:
             return "Untitled Campaign"
@@ -169,10 +167,10 @@ def _infer_title_from_summary(world_summary: str, fallback_setting: str) -> str:
     return title
 
 
-def _sanitize_world_text(text: str) -> str:
-    """
-    Light cleanup: remove obvious code tags, separator bars, and trim.
-    """
+def _sanitize_world_text(text: str):
+    
+    # Light cleanup: remove obvious code tags, separator bars, and trim.
+    
     cleaned = text.replace("<code>", "").replace("</code>", "")
 
     # Remove decorative separators like ====, ----, ====123, etc.
@@ -185,17 +183,9 @@ def _sanitize_world_text(text: str) -> str:
     return "\n".join(lines).strip()
 
 
-def _split_sections(text: str) -> Dict[str, str]:
+def _split_sections(text: str):
     """
-    Split the model output into sections based on our headers:
-
-    TITLE:
-    WORLD SUMMARY:
-    LORE:
-    MAJOR LOCATIONS (3):
-    MINOR LOCATIONS (5):
-    WORLD SKILLS:
-    THEMES & TONE:
+    Split the model output into sections based on:   TITLE: WORLD SUMMARY:  LORE:MAJOR LOCATIONS (3): MINOR LOCATIONS (5): WORLD SKILLS:  THEMES & TONE: 
     """
     sections: Dict[str, List[str]] = {}
     current_key: str | None = None
@@ -207,7 +197,7 @@ def _split_sections(text: str) -> Dict[str, str]:
         if re.match(r"^\s*[=\-]{3,}\s*\d*(\s*lines?)?\s*$", line, flags=re.IGNORECASE):
             continue
 
-        # detect headers (we use startswith so the model can be a bit fuzzy)
+        # detect headers 
         if line.upper().startswith("TITLE:"):
             current_key = "TITLE"
             sections[current_key] = []
@@ -244,14 +234,10 @@ def _split_sections(text: str) -> Dict[str, str]:
     return {k: "\n".join(v).strip() for k, v in sections.items()}
 
 
-def _parse_locations_section(block: str) -> List[Dict[str, str]]:
-    """
-    Parse a numbered locations section into a list of {name, description} dicts.
+def _parse_locations_section(block: str):
+    
+    # NAME:DESCRP ...
 
-    Expected formats, roughly:
-    1. NAME — description...
-    2. NAME - description...
-    """
     locations: List[Dict[str, str]] = []
 
     for raw_line in block.splitlines():
@@ -266,11 +252,11 @@ def _parse_locations_section(block: str) -> List[Dict[str, str]]:
 
         rest = m.group(1).strip()
 
-        # Try to split name / description on "—" or "-"
+        # Try to split name / description on "-" style separators.
         name = rest
         desc = ""
-        if "—" in rest:
-            name_part, desc_part = rest.split("—", 1)
+        if "\u2014" in rest:
+            name_part, desc_part = rest.split("\u2014", 1)
             name = name_part.strip()
             desc = desc_part.strip()
         elif " - " in rest:
@@ -292,38 +278,30 @@ def _parse_locations_section(block: str) -> List[Dict[str, str]]:
     return locations
 
 
-def _parse_bullet_list(block: str) -> List[str]:
-    """
-    Parse a simple bullet list ("- item" or "• item") into a list of strings.
-    Used for world skills and themes.
-    """
+def _parse_bullet_list(block: str):
+   
+    # Parse a simple bullet list ("- item" or "* item") into a list of strings.
+   
     items: List[str] = []
     for raw_line in block.splitlines():
         line = raw_line.strip()
         if not line:
             continue
         # strip bullet prefixes
-        if line.startswith("-") or line.startswith("•"):
+        if line.startswith("-") or line.startswith("*"):
             line = line[1:].strip()
         if line:
             items.append(line)
     return items
 
 
-def _parse_world_output(text: str, fallback_setting: str) -> Tuple[
-    str, str, str, List[str], List[Dict[str, str]], List[Dict[str, str]], List[str]
-]:
+def _parse_world_output(text: str, fallback_setting: str):
     """
     Parse model output into:
       (title, world_summary, lore, skills, major_locations, minor_locations, themes)
 
-    Matches the template sections:
-    - WORLD SUMMARY
-    - LORE
-    - MAJOR LOCATIONS (3)
-    - MINOR LOCATIONS (5)
-    - WORLD SKILLS
-    - THEMES & TONE
+    Matches the template sections: .TITLE .WORLD SUMMARY .LORE .MAJOR LOCATIONS (3) .MINOR LOCATIONS (5) .WORLD SKILLS .THEMES & TONE
+
     """
     cleaned = _sanitize_world_text(text)
     if not cleaned:

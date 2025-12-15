@@ -21,12 +21,9 @@ class RollResult:
     reason: Optional[str] = None
 
 
-def roll_dice(expr: str, reason: Optional[str] = None) -> RollResult:
-    """
-    Parse dice expression like "1d20+3" or "2d6-1" and roll it.
-
-    Returns RollResult(expression, total, rolls, modifier, reason).
-    """
+def roll_dice(expr: str, reason: Optional[str] = None):
+    # Parse dice expression like "1d20+3" or "2d6-1" and roll it.
+    
     m = ROLL_RE.match(expr)
     if not m:
         raise ValueError(f"Invalid dice expression: {expr!r}")

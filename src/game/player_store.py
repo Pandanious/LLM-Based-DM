@@ -8,14 +8,14 @@ SAVE_DIR = Path("saves")
 SAVE_DIR.mkdir(exist_ok=True)
 
 
-def _world_players_path(world_id: str) -> Path:
+def _world_players_path(world_id: str):
     return SAVE_DIR / f"{world_id}_players.json"
 
 
-def load_player_characters(world_id: str) -> Dict[str, PlayerCharacter]:
-    """
-    Load all PCs for a given world as a dict {pc_id: PlayerCharacter}.
-    """
+def load_player_characters(world_id: str):
+    
+    # Load all PCs for a given world as a dict {pc_id: PlayerCharacter}.
+    
     path = _world_players_path(world_id)
     if not path.exists():
         return {}
@@ -29,10 +29,9 @@ def load_player_characters(world_id: str) -> Dict[str, PlayerCharacter]:
     return pcs
 
 
-def save_player_characters(world_id: str, pcs: Dict[str, PlayerCharacter]) -> None:
-    """
-    Save all PCs for a given world from a dict {pc_id: PlayerCharacter}.
-    """
+def save_player_characters(world_id: str, pcs: Dict[str, PlayerCharacter]):
+    # Save all PCs for a given world from a dict {pc_id: PlayerCharacter}.
+    
     path = _world_players_path(world_id)
     data = {pc_id: pc.to_dict() for pc_id, pc in pcs.items()}
 

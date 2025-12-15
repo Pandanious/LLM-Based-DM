@@ -76,7 +76,7 @@ Important style rules:
 NPC_HEADER_RE = re.compile(r"^NPC\s+(\d+):\s*$", re.MULTILINE)
 
 
-def _format_locations(locations: List[Dict[str, str]]) -> str:
+def _format_locations(locations: List[Dict[str, str]]):
     if not locations:
         return "- (none listed)"
     lines = []
@@ -90,10 +90,10 @@ def _format_locations(locations: List[Dict[str, str]]) -> str:
     return "\n".join(lines)
 
 
-def _split_npc_chunks(text: str) -> List[str]:
-    """
-    Split the LLM output into chunks, one per NPC, based on 'NPC X:' headers.
-    """
+def _split_npc_chunks(text: str):
+    
+    # split the LLM output into chunks, one per NPC, based on 'NPC X:' headers.
+    
     matches = list(NPC_HEADER_RE.finditer(text))
     if not matches:
         return []
@@ -108,17 +108,17 @@ def _split_npc_chunks(text: str) -> List[str]:
     return chunks
 
 
-def _parse_field(pattern: str, text: str) -> str:
+def _parse_field(pattern: str, text: str):
     m = re.search(pattern, text, re.IGNORECASE | re.MULTILINE)
     if not m:
         return ""
     return m.group(1).strip()
 
 
-def _parse_list_block(label: str, text: str) -> List[str]:
-    """
-    Extract a bullet list under a label like 'Hooks:' or 'Tags:' with minimal normalization.
-    """
+def _parse_list_block(label: str, text: str):
+    
+    # Extract a bullet list under a label like 'Hooks:' or 'Tags:' with minimal normalization.
+    
     pattern = rf"{label}:\s*(.+?)(?:\n\w+:|\Z)"
     m = re.search(pattern, text, re.IGNORECASE | re.DOTALL)
     if not m:
@@ -136,11 +136,10 @@ def _parse_list_block(label: str, text: str) -> List[str]:
     return items
 
 
-def _pick_location_name(world: World_State, preferred: Optional[str]) -> str:
-    """
-    Try to map a free-text location name back to one of the world's major/minor
-    location names. If we can't, just return the preferred text or a fallback.
-    """
+def _pick_location_name(world: World_State, preferred: Optional[str]):
+    
+    # Try to map a free-text location name back to one of the world's major/minor location names. If it can't, just return the preferred text or a fallback.
+    
     all_names: List[str] = []
     for loc in (world.major_locations or []):
         name = loc.get("name")
@@ -167,10 +166,9 @@ def _pick_location_name(world: World_State, preferred: Optional[str]) -> str:
     return preferred or "Unknown location"
 
 
-def _label_item(item) -> str:
-    """
-    Build a readable label for an Item without depending on full Item type here.
-    """
+def _label_item(item):
+    # Build a readable label for an Item without depending on full Item type.
+    
     name = getattr(item, "item_name", "Item")
     category = getattr(item, "item_category", "") or "gear"
     sub = getattr(item, "item_subcategory", "")
@@ -191,11 +189,8 @@ def _label_item(item) -> str:
 def _ensure_minimum_npcs(
     world: World_State,
     npcs: Dict[str, NPC],
-    min_npcs: int,
-) -> None:
-    """
-    If the LLM produced fewer than min_npcs, pad with generic filler NPCs.
-    """
+    min_npcs: int):
+    
     if len(npcs) >= min_npcs:
         return
 
@@ -224,11 +219,9 @@ def _ensure_minimum_npcs(
         )
 
 
-def _ensure_roles_per_minor_location(world: World_State, npcs: Dict[str, NPC]) -> None:
-    """
-    Ensure that each minor location has at least one merchant / leader / quest giver.
-    If missing, create simple NPCs with those roles.
-    """
+def _ensure_roles_per_minor_location(world: World_State, npcs: Dict[str, NPC]):
+    
+    # Ensure that each minor location has at least one merchant / leader / quest giver.
     role_keywords = {
         "merchant": ["merchant", "trader", "vendor", "shopkeeper", "fixer"],
         "leader": ["leader", "mayor", "boss", "captain", "elder", "manager"],
@@ -249,7 +242,7 @@ def _ensure_roles_per_minor_location(world: World_State, npcs: Dict[str, NPC]) -
             text = f"{npc.role} {' '.join(npc.tags)}".lower()
             lower_roles.append(text)
 
-        def has_role(kind: str) -> bool:
+        def has_role(kind: str):
             keywords = role_keywords[kind]
             for text in lower_roles:
                 for kw in keywords:
@@ -272,8 +265,8 @@ def _ensure_roles_per_minor_location(world: World_State, npcs: Dict[str, NPC]) -
             tags = [kind.replace(" ", "_"), "auto_generated"]
             desc = (
                 f"A local {kind} for {loc_name}, created automatically to ensure "
-                f"every minor location has key NPC roles."
-            )
+                f"every minor location has key NPC roles.")
+            
             npcs[npc_id] = NPC(
                 npc_id=npc_id,
                 world_id=world.world_id,
@@ -289,21 +282,17 @@ def _ensure_roles_per_minor_location(world: World_State, npcs: Dict[str, NPC]) -
             )
 
 
-def generate_npcs_for_world(world: World_State, max_npcs: int = 10) -> Dict[str, NPC]:
-    """
-    Ask the LLM to suggest a roster of NPCs for the given world, then enforce
-    minimum counts and per-location role coverage.
+def generate_npcs_for_world(world: World_State, max_npcs: int = 10):
+    # Ask the LLM to suggest a roster of NPCs for the given world, then enforce minimum counts and per-location role.
 
-    Returns a dict npc_id -> NPC.
-    """
     llm = get_llm()
 
     major_locations_str = _format_locations(world.major_locations)
     minor_locations_str = _format_locations(world.minor_locations)
     players_str = ", ".join(world.players) if world.players else "Unknown players"
 
-    # Ask the LLM for up to max_npcs. We won't pad with generic extras.
-    min_npcs_base = 0  # disable filler NPC padding
+    
+    min_npcs_base = 0  
 
     prompt = NPC_GEN_PROMPT_TEMPLATE.format(
         world_summary=world.world_summary,
@@ -361,7 +350,7 @@ def generate_npcs_for_world(world: World_State, max_npcs: int = 10) -> Dict[str,
             created_on=now,
             last_updated=now,
         )
-        # If this looks like a merchant, generate a small inventory
+        # If looks like a merchant, generate a small inventory
         role_text = f"{role} {' '.join(tags)}".lower()
         if any(word in role_text for word in ["merchant", "trader", "vendor", "shopkeeper"]):
             try:

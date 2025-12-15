@@ -57,7 +57,7 @@ ACTION_SYNONYMS: Dict[str, str] = {
     "hammer": "damage_heavy",
     "axe": "damage_heavy",
     "maul": "damage_heavy",
-    "power": "damage_heavy",   # as in “power attack”
+    "power": "damage_heavy",   # as in "power attack"
     "heavy": "damage_heavy",
     
     # GENERIC ATTACK use damage_light
@@ -127,7 +127,7 @@ META_COMMANDS = {
 }
 
 
-def register_action_synonym(trigger: str, action_type: str) -> None:
+def register_action_synonym(trigger: str, action_type: str):
     
     trigger = trigger.strip().lower()
     action_type = action_type.strip().lower()
@@ -139,7 +139,7 @@ def register_action_synonym(trigger: str, action_type: str) -> None:
     ACTION_SYNONYMS[trigger] = action_type
 
 
-def _normalize_action_from_rest(rest: str) -> Optional[str]:
+def _normalize_action_from_rest(rest: str):
     
     rest = rest.strip()
     if not rest:
@@ -149,14 +149,14 @@ def _normalize_action_from_rest(rest: str) -> Optional[str]:
     return ACTION_SYNONYMS.get(first_word)
 
 
-def parse_command(text: str) -> Optional[ParsedCommand]:
+def parse_command(text: str):
     
     if not text:
         return None
 
     raw = text.strip()
     if not raw.startswith("/"):
-        # Not a command — treat as normal in-character speech.
+        # Not a command - treat as normal in-character speech.
         return None
 
     # Strip leading "/" and split.

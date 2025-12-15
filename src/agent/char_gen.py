@@ -65,7 +65,7 @@ ARCHETYPE: <class or role>
 LEVEL: 1
 
 CONCEPT:
-<2–4 sentences>
+<2-4 sentences>
 
 STATS:
 STR: <number>
@@ -93,11 +93,9 @@ def generate_character_sheet(
     pc_id: str,
     char_name: str,
     gender: str,
-    ancestry: str,
-) -> PlayerCharacter:
+    ancestry: str,):
     
-    # Use the LLM to generate a medium-detailed character sheet, keeping name, gender,
-    # and ancestry fixed, and picking skills from the world's skill list.
+    
     llm = get_llm()
 
     skills_str = ", ".join(world_skills) if world_skills else "no specific skills listed"
@@ -118,10 +116,10 @@ def generate_character_sheet(
         result = llm(
             prompt,
             max_tokens=600,
-            temperature=0.65,   # a bit lower for more discipline
+            temperature=0.65,   
             top_p=0.9,
             top_k=40,
-            repeat_penalty=1.2,  # slightly stronger to reduce rambling
+            repeat_penalty=1.2,  
         )
         raw = _clean_raw_text(result["choices"][0]["text"])
         if _looks_like_sheet(raw):
@@ -139,7 +137,7 @@ def generate_character_sheet(
         world_summary=world_summary,
     )
 
-def _parse_stat_block(block: str) -> Dict[str, int]:
+def _parse_stat_block(block: str):
     stats: Dict[str, int] = {}
     pattern = re.compile(r"(STR|DEX|CON|INT|WIS|CHA)\s*:\s*(\d+)", re.IGNORECASE)
     for stat, value in pattern.findall(block):
@@ -151,19 +149,19 @@ def _parse_stat_block(block: str) -> Dict[str, int]:
 
 
 
-def _parse_list_block(block: str) -> List[str]:
+def _parse_list_block(block: str):
     items: List[str] = []
     seen = set()
     for raw_line in block.splitlines():
         line = raw_line.strip()
         if not line:
             continue
-        if line.startswith("-") or line.startswith("•"):
+        if line.startswith("-") or line.startswith("*"):
             line = line[1:].strip()
         if not line:
             continue
         lower_line = line.lower()
-        # Skip obvious header/marker pollution and model self-talk
+        
         if lower_line.startswith(
             (
                 "name:",
@@ -192,9 +190,9 @@ def _parse_list_block(block: str) -> List[str]:
     return items
 
 
-def _dedupe_sentences(text: str, max_sentences: int = 4) -> str:
+def _dedupe_sentences(text: str, max_sentences: int = 4):
     
-    # crude sentence split on . ! and remove same text. ?
+    
     parts = re.split(r"([\.!?])", text)
     sentences = []
     current = ""
@@ -225,12 +223,11 @@ def _dedupe_sentences(text: str, max_sentences: int = 4) -> str:
     return " ".join(cleaned).strip()
 
 
-def _clean_raw_text(raw: str) -> str:
+def _clean_raw_text(raw: str):
     text = raw.strip()
-    # Remove fenced code blocks or backtick wrappers the model might emit
     text = re.sub(r"^```(?:\w+)?\\n?", "", text)
     text = re.sub(r"```$", "", text)
-    # Truncate at the first stop marker we see
+    
     lower_text = text.lower()
     for marker in STOP_MARKERS:
         idx = lower_text.find(marker)
@@ -238,11 +235,11 @@ def _clean_raw_text(raw: str) -> str:
             text = text[:idx]
             lower_text = text.lower()
             break
-    # Drop any END markers in various forms
+    
     text = text.replace(f"END: {END_MARKER}", "")
     text = text.replace(END_MARKER, "")
     text = text.replace("END:", "")
-    # Remove a leading “Character Sheet” label if present
+   
     text = re.sub(r"^Character Sheet:?\\s*", "", text, flags=re.IGNORECASE)
     return text.strip()
 
@@ -253,8 +250,7 @@ def _parse_character_text(
     fixed_name: str,
     fixed_gender: str,
     fixed_ancestry: str,
-    world_summary: str,
-) -> PlayerCharacter:
+    world_summary: str,):
     
     #Parse the LLM's character text into a PlayerCharacter. Keeps name, gender etc user choices.
     
@@ -262,23 +258,20 @@ def _parse_character_text(
 
     # Archetype and level
     archetype_match = re.search(
-        r"^ARCHETYPE:\s*(.+)$", text, re.MULTILINE | re.IGNORECASE
-    )
+        r"^ARCHETYPE:\s*(.+)$", text, re.MULTILINE | re.IGNORECASE)
 
     archetype = archetype_match.group(1).strip() if archetype_match else ""
-    level = 1  # always 1 for new characters; ignore model level if present
+    level = 1  
 
     # Concept block
     concept_match = re.search(
-        r"CONCEPT:\s*(.+?)(?:\n\n|STATS:)", text, re.DOTALL | re.IGNORECASE
-    )
+        r"CONCEPT:\s*(.+?)(?:\n\n|STATS:)", text, re.DOTALL | re.IGNORECASE)
     raw_concept = concept_match.group(1).strip() if concept_match else ""
     concept = _dedupe_sentences(raw_concept, max_sentences=4)
 
     # Stats
     stats_block_match = re.search(
-        r"STATS:\s*(.+?)(?:\n\n|MAX HP:)", text, re.DOTALL | re.IGNORECASE
-    )
+        r"STATS:\s*(.+?)(?:\n\n|MAX HP:)", text, re.DOTALL | re.IGNORECASE)
     stats_block = stats_block_match.group(1) if stats_block_match else ""
     stats = _parse_stat_block(stats_block)
 
@@ -288,8 +281,7 @@ def _parse_character_text(
 
     # Skills
     skills_match = re.search(
-        r"SKILLS:\s*(.+)$", text, re.DOTALL | re.IGNORECASE
-    )
+        r"SKILLS:\s*(.+)$", text, re.DOTALL | re.IGNORECASE)
     skills_block = skills_match.group(1) if skills_match else ""
     skills = _parse_list_block(skills_block)
 
@@ -310,14 +302,14 @@ def _parse_character_text(
         skills=skills,
         notes=[],
         created_on=now,
-        last_updated=now,    )
+        last_updated=now)
 
     try:
-        # roll_dice only expects an expression; use a simple d20 for initiative
+        
         init_result = roll_dice("1d20")
         pc.initiative = init_result.total
     except Exception:
-        # Fallback so we never crash character generation
+        
         pc.initiative = 0
 
     # Generate starter gear separately and attach simple labels to inventory
@@ -343,10 +335,8 @@ def _parse_character_text(
     return pc
 
 
-def _looks_like_sheet(text: str) -> bool:
-    """
-    Cheap validation to see if the LLM returned something structured enough to parse.
-    """
+def _looks_like_sheet(text: str):
+ 
     if not text.strip():
         return False
     markers = ["ARCHETYPE:", "STATS:", "SKILLS:"]

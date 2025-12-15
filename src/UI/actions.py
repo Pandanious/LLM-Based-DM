@@ -21,11 +21,10 @@ from src.UI.initiative import current_actor, add_turn_system_message
 import re
 
 
-def _resolve_actor(game: GameState, speaker: str) -> Optional[PlayerCharacter]:
-    """
-    Try to find the PlayerCharacter being referenced by the current speaker label.
-    Speaker may be 'player' or 'player:character'.
-    """
+def _resolve_actor(game: GameState, speaker: str):
+    
+    #Try to find the PlayerCharacter being referenced by the current speaker label.
+    
     if not game.player_characters:
         return None
 
@@ -44,11 +43,8 @@ def _resolve_actor(game: GameState, speaker: str) -> Optional[PlayerCharacter]:
     return None
 
 
-def _derive_world_id(prompt: str, fallback: str) -> str:
-    """
-    Build a stable, filesystem-friendly world_id from the user's prompt.
-    Falls back to the provided fallback (game_id) if the prompt is empty.
-    """
+def _derive_world_id(prompt: str, fallback: str):
+    #Build a stable, filesystem-friendly world_id from the user's prompt.
     if prompt:
         # keep letters/numbers, replace gaps with dashes, trim repeats, shorten
         slug = re.sub(r"[^a-zA-Z0-9]+", "-", prompt).strip("-").lower()
@@ -58,10 +54,10 @@ def _derive_world_id(prompt: str, fallback: str) -> str:
     return fallback or "default"
 
 
-def handle_world_creation(user_input: str, game_id: str, game: GameState) -> None:
-    """
-    Handle the very first input that creates a world.
-    """
+def handle_world_creation(user_input: str, game_id: str, game: GameState):
+   
+    # Handle the very first input that creates a world.
+    
     desc_msg = Message(role="user", content=user_input, speaker="Player")
     game.messages.append(desc_msg)
 
@@ -117,11 +113,10 @@ def handle_world_creation(user_input: str, game_id: str, game: GameState) -> Non
         game.busy_task = None
 
 
-def handle_gameplay_input(user_input: str, game: GameState, speaker: str) -> None:
-    """
-    Handle normal gameplay input when a world and PCs exist.
-    Includes /quest commands and dice-enabled DM turns.
-    """
+def handle_gameplay_input(user_input: str, game: GameState, speaker: str):
+    
+    # Handle normal gameplay input when a world and PCs exist.
+    
     if game.world is not None and not hasattr(game, "turn_log"):
         game.turn_log = load_turn_log(game.world.world_id)
 

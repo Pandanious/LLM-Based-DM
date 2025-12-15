@@ -6,7 +6,7 @@ from src.agent.types import Message
 from src.game.game_state import GameState
 
 
-def _current_actor_label(game: GameState) -> str:
+def _current_actor_label(game: GameState):
     if not game.initiative_order or not game.player_characters:
         return "none set"
     idx = getattr(game, "active_turn_index", 0)
@@ -19,7 +19,7 @@ def _current_actor_label(game: GameState) -> str:
     return f"{pc.player_name} as {pc.name}"
 
 
-def _initiative_order_label(game: GameState) -> str:
+def _initiative_order_label(game: GameState):
     if not game.initiative_order or not game.player_characters:
         return "unset"
     names = [
@@ -30,7 +30,7 @@ def _initiative_order_label(game: GameState) -> str:
     return " > ".join(names) if names else "unset"
 
 
-def _quest_labels(game: GameState, limit: int = 3) -> List[str]:
+def _quest_labels(game: GameState, limit: int = 3):
     quests = getattr(game, "quests", {}) or {}
     if not quests:
         return []
@@ -42,11 +42,10 @@ def _quest_labels(game: GameState, limit: int = 3) -> List[str]:
     return labels[:limit]
 
 
-def build_mechanics_prompt(game: GameState) -> str:
-    """
-    Build a concise mechanics/state reminder for the DM to keep dice,
-    turn order, quests, and encounters consistent.
-    """
+def build_mechanics_prompt(game: GameState):
+    
+    #Build a concise mechanics/state reminder for the DM to keep dice, turn order, quests, and encounters consistent.
+    
     parts: List[str] = []
     parts.append("[MECHANICS] Table rules and current state:")
     parts.append(
@@ -70,10 +69,9 @@ def build_mechanics_prompt(game: GameState) -> str:
     return "\n".join(parts)
 
 
-def refresh_mechanics_prompt(game: GameState) -> None:
-    """
-    Remove old mechanics prompts and append the latest one.
-    """
+def refresh_mechanics_prompt(game: GameState):
+    #Remove old mechanics prompts and append the latest one.
+    
     if not game or not game.messages:
         return
     game.messages = [

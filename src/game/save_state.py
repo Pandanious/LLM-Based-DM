@@ -7,14 +7,14 @@ SAVE_DIR = Path("saves")
 SAVE_DIR.mkdir(exist_ok=True)
 
 
-def save_world_state(world: World_State) -> None:
+def save_world_state(world: World_State):
     path = SAVE_DIR / f"{world.world_id}.json"
     data = world.to_dict()
     with path.open("w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False, default=str)
 
 
-def load_world_state(world_id: str) -> Optional[World_State]:
+def load_world_state(world_id: str):
     path = SAVE_DIR / f"{world_id}.json"
     if not path.exists():
         return None

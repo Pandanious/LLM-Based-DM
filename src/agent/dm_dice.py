@@ -10,10 +10,6 @@ from src.game.models import PlayerCharacter
 from src.game.action_modifiers import compute_action_modifier, evaluate_check
 from src.llm_client import chat_completion
 
-# ---------------------------------------------------------------------------
-# Action labels we expect the DM to use in the [ROLL_REQUEST] reason field.
-# These must match the list in your persona prompt.
-# ---------------------------------------------------------------------------
 
 ALLOWED_ACTION_TYPES = {
     "attack",
@@ -24,13 +20,12 @@ ALLOWED_ACTION_TYPES = {
     "athletics",
     "acrobatics",
     "damage_light",
-    "damage_heavy",
-}
+    "damage_heavy",}
 
 # [ROLL_REQUEST: 1d20+3 | stealth_check: sneak past the guard]
+
 ROLL_REQUEST_RE = re.compile(
-    r"\[ROLL_REQUEST:\s*(?P<expr>.+?)\s*\|\s*(?P<reason>.+?)\s*\]"
-)
+    r"\[ROLL_REQUEST:\s*(?P<expr>.+?)\s*\|\s*(?P<reason>.+?)\s*\]")
 
 SUMMARY_SYSTEM_PROMPT = (
     "You are a session scribe. Summarize the prior turns into concise notes. "
@@ -49,7 +44,7 @@ def _get_corpus():
     return _CORPUS
 
 
-def _messages_to_transcript(messages: List[Message]) -> str:
+def _messages_to_transcript(messages: List[Message]):
     lines = []
     for m in messages:
         speaker = m.speaker or m.role.capitalize()
@@ -58,7 +53,7 @@ def _messages_to_transcript(messages: List[Message]) -> str:
     return "\n".join(lines)
 
 
-def _summarize_history(messages: List[Message]) -> Optional[str]:
+def _summarize_history(messages: List[Message]):
     if not messages:
         return None
     transcript = _messages_to_transcript(messages)
@@ -73,8 +68,8 @@ def _summarize_history(messages: List[Message]) -> Optional[str]:
     return summary.strip() if summary else None
 
 
-def _maybe_summarize_history(messages: List[Message], limit: int = 60, keep_recent: int = 18) -> List[Message]:
-    """Collapse older turns into a single summary system message once history grows."""
+def _maybe_summarize_history(messages: List[Message], limit: int = 60, keep_recent: int = 18):
+    
     if len(messages) <= limit:
         return messages
 
@@ -95,7 +90,7 @@ def _maybe_summarize_history(messages: List[Message], limit: int = 60, keep_rece
     return anchors + [summary_msg] + recent_slice
 
 
-def _build_context_prefix(messages: List[Message], top_k: int = 5) -> str:
+def _build_context_prefix(messages: List[Message], top_k: int = 5):
     corpus = _get_corpus()
     if not corpus:
         return (
@@ -119,8 +114,8 @@ def _build_context_prefix(messages: List[Message], top_k: int = 5) -> str:
     return f"{context_block}\n{guard}"
 
 
-def parse_roll_request(text: str) -> Optional[tuple[str, str]]:
-    # Extract (dice_expr, reason) from a DM reply, if present
+def parse_roll_request(text: str):
+    # Extract (dice_expr, reason)
 
     m = ROLL_REQUEST_RE.search(text)
     if not m:
@@ -130,7 +125,7 @@ def parse_roll_request(text: str) -> Optional[tuple[str, str]]:
     return expr, reason
 
 
-def parse_action_type(reason: str) -> Optional[str]:
+def parse_action_type(reason: str):
     
     m = re.match(r"^\s*([a-zA-Z_]+)\s*:", reason)
     if not m:
@@ -141,7 +136,7 @@ def parse_action_type(reason: str) -> Optional[str]:
     return None
 
 
-def ensure_action_label_in_reason(reason: str, fallback_action: str) -> str:
+def ensure_action_label_in_reason(reason: str, fallback_action: str):
     
     if parse_action_type(reason) is not None:
         return reason
@@ -149,9 +144,7 @@ def ensure_action_label_in_reason(reason: str, fallback_action: str) -> str:
     return f"{fallback}: {reason}"
 
 
-def _find_pc_for_speaker(
-    speaker: Optional[str],
-    player_characters: Dict[str, PlayerCharacter],):
+def _find_pc_for_speaker(speaker: Optional[str], player_characters: Dict[str, PlayerCharacter]):
     
     if not speaker:
         return None
@@ -162,9 +155,7 @@ def _find_pc_for_speaker(
     return None
 
 
-def dm_turn_with_dice(
-    messages: List[Message],
-    player_characters: Dict[str, PlayerCharacter],):
+def dm_turn_with_dice(messages: List[Message], player_characters: Dict[str, PlayerCharacter]):
     
     # Collapse long histories to a summary to save context
     messages[:] = _maybe_summarize_history(messages)
@@ -188,12 +179,10 @@ def dm_turn_with_dice(
     
     last_user = next(
         (m for m in reversed(messages) if m.role == "user"),
-        None,
-    )
+        None)
     actor_pc = _find_pc_for_speaker(
         getattr(last_user, "speaker", None) if last_user else None,
-        player_characters,
-    )
+        player_characters)
 
     # Determine action_type and normalize the reason label
     
@@ -204,7 +193,6 @@ def dm_turn_with_dice(
     reason = ensure_action_label_in_reason(reason, action_type)
 
     
-    # Build a final dice expression using stats/skills instead of DM's modifier
     
     # For non-damage actions, always treat as a d20 check.
     if action_type in {"damage_light", "damage_heavy"}:
@@ -233,10 +221,9 @@ def dm_turn_with_dice(
     dc, outcome = evaluate_check(
         total=result.total,
         action_type=action_type,
-        reason=reason,
-    )
+        reason=reason)
 
-    # Add a [ROLL_RESULT: ...] line as a system message
+    # Add a [ROLL_RESULT: ...] 
     
     extra_parts = [
         f"rolls={result.rolls}",
@@ -252,10 +239,7 @@ def dm_turn_with_dice(
 
     extra_str = ", ".join(extra_parts)
 
-    roll_result_line = (
-        f"[ROLL_RESULT: {result.expression} = {result.total} "
-        f"({extra_str}) | {result.reason}]"
-    )
+    roll_result_line = (f"[ROLL_RESULT: {result.expression} = {result.total} " f"({extra_str}) | {result.reason}]")
 
     roll_message = Message(role="system", content=roll_result_line, speaker=None)
     messages.append(roll_message)
@@ -267,8 +251,7 @@ def dm_turn_with_dice(
     outcome_message = Message(
         role="assistant",
         content=outcome_text,
-        speaker="Dungeon Master",
-    )
+        speaker="Dungeon Master")
     messages.append(outcome_message)
 
     return messages

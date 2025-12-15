@@ -10,11 +10,9 @@ from src.game.turn_store import load_turn_log
 from src.game.game_state import GameState
 
 
-def render_save_controls(game: GameState) -> None:
-    """
-    Render buttons + handlers for saving/loading world bundles
-    and refreshing the party summary. To be called inside the sidebar.
-    """
+def render_save_controls(game: GameState):
+    #Render buttons + handlers for saving/loading world bundles and refreshing the party summary. called from the sidebar.
+    
     save_state_clicked = st.button("Save world state", disabled=game.world is None)
     quick_seed_clicked = st.button(
         "Auto-save world seed (title + players)",

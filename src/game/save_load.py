@@ -8,15 +8,12 @@ from src.game.game_state import GameState
 from src.game.models import World_State, PlayerCharacter, NPC, Quest
 
 
-def _slug(text: str) -> str:
+def _slug(text: str):
     return re.sub(r"[^A-Za-z0-9_-]+", "_", text).strip("_") or "game"
 
 
-def save_world_bundle(game: GameState, dest_dir: Path | str = "saves/bundles") -> Path:
-    """
-    Save the entire game state (world, PCs, NPCs, quests, initiative) into a single JSON bundle.
-    Returns the path to the saved file.
-    """
+def save_world_bundle(game: GameState, dest_dir: Path | str = "saves/bundles"):
+    
     if game.world is None:
         raise ValueError("Cannot save bundle: world is missing.")
 
@@ -41,12 +38,8 @@ def save_world_bundle(game: GameState, dest_dir: Path | str = "saves/bundles") -
     return bundle_path
 
 
-def save_world_seed_bundle(game: GameState, dest_dir: Path | str = "saves/bundles") -> Path:
-    """
-    Save a deterministic bundle keyed to the world + players so you can reload
-    without re-running world generation. Overwrites if the same world/players
-    combination is saved again.
-    """
+def save_world_seed_bundle(game: GameState, dest_dir: Path | str = "saves/bundles"):
+    
     if game.world is None:
         raise ValueError("Cannot save bundle: world is missing.")
 
@@ -73,10 +66,8 @@ def save_world_seed_bundle(game: GameState, dest_dir: Path | str = "saves/bundle
     return bundle_path
 
 
-def load_world_bundle(path_or_bytes: Path | str | bytes) -> Tuple[World_State, Dict[str, PlayerCharacter], Dict[str, NPC], Dict[str, Quest], list, int]:
-    """
-    Load a bundle produced by save_world_bundle and return its components.
-    """
+def load_world_bundle(path_or_bytes: Path | str | bytes):
+    
     if isinstance(path_or_bytes, (str, Path)):
         raw = Path(path_or_bytes).read_text(encoding="utf-8")
     else:

@@ -112,6 +112,6 @@ st.markdown(
 - **Save world state** writes a bundle JSON of world, PCs, NPCs, quests, and initiative to `saves/bundles/`.
 - **Load world state** restores from a bundle and rebuilds prompts and party summary.
 - If rolls seem off, refresh the party summary to sync PCs.
-- If something is stuck, verify you’re using the same **Game ID** in all tabs, then try a gentle page reload.
+- If something is stuck, verify you're using the same **Game ID** in all tabs, then try a gentle page reload.
 """
 )

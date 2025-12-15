@@ -8,7 +8,7 @@ from src.game.turn_store import load_turn_log, begin_turn, save_turn_log
 from src.UI.mechanics_prompt import refresh_mechanics_prompt
 
 
-def rebuild_initiative_order(game: GameState) -> None:
+def rebuild_initiative_order(game: GameState):
     pcs = game.player_characters or {}
     ordered = sorted(
         pcs.values(),
@@ -19,7 +19,7 @@ def rebuild_initiative_order(game: GameState) -> None:
     game.active_turn_index = 0 if game.initiative_order else 0
 
 
-def current_actor(game: GameState) -> Optional[object]:
+def current_actor(game: GameState):
     if not game.initiative_order:
         return None
     if game.active_turn_index >= len(game.initiative_order):
@@ -28,7 +28,7 @@ def current_actor(game: GameState) -> Optional[object]:
     return game.player_characters.get(pc_id)
 
 
-def add_turn_system_message(game: GameState, pc) -> None:
+def add_turn_system_message(game: GameState, pc):
     if not pc:
         return
     turn_line = (
@@ -39,11 +39,10 @@ def add_turn_system_message(game: GameState, pc) -> None:
     game.messages.append(Message(role="system", content=turn_line))
 
 
-def render_initiative_controls(game: GameState) -> None:
-    """
-    Render the initiative controls into whatever container calls this.
-    (In your app, it's rendered inside the sidebar.)
-    """
+def render_initiative_controls(game: GameState):
+    
+    #initiative controls.
+    
     st.subheader("Initiative")
     pcs_exist = bool(game.player_characters)
 

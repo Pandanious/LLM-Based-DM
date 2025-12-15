@@ -1,6 +1,8 @@
 import os
 from functools import lru_cache
 from typing import List
+from src.metrics.metrics import track_gen,metrics
+
 
 # Ensure CUDA/ggml DLLs are discoverable when llama_cpp loads.
 _dll_dirs = (
@@ -26,12 +28,11 @@ from src.config import (
     default_temp,
     gpu_layers,
     max_CTX,
-    model_path,
-)
+    model_path,)
 
 
 @lru_cache(maxsize=1)
-def get_llm() -> Llama:
+def get_llm():
     """Load and cache the Llama model."""
     return Llama(
         model_path=str(model_path),
@@ -42,7 +43,7 @@ def get_llm() -> Llama:
     )
 
 
-def format_prompt(messages: List[Message]) -> str:
+def format_prompt(messages: List[Message]):
     # how to instruct the model.. {role:user:content}
 
     parts = []
@@ -63,8 +64,7 @@ def chat_completion(
     messages: List[Message],
     temperature: float = default_temp,
     max_tokens: int = default_max_tokens,
-    prefix: str = "",
-) -> str:
+    prefix: str = ""):
 
     llm = get_llm()
 
@@ -75,9 +75,8 @@ def chat_completion(
     prompt_body = format_prompt(trimmed_messages)
     prompt = f"{prefix}\n{prompt_body}" if prefix else prompt_body
     # Debug: show the prompt in the console
-    print("\n=== LLM PROMPT START ===\n")
-    print(prompt)
-    print("\n=== LLM PROMPT END ===\n")
+    #print("\n=== LLM PROMPT START ===\n")
+    '''
     result = llm(
         prompt,
         max_tokens=max_tokens,
@@ -86,8 +85,20 @@ def chat_completion(
         top_k=40,
         repeat_penalty=1.1,
         # Stop the model as soon as it tries to start a new turn or switch speaker
-        stop=["[PLAYER", "[ASSISTANT", "[SYSTEM", "[ITEM", "</s>"],
-    )
+        stop=["[PLAYER", "[ASSISTANT", "[SYSTEM", "[ITEM", "</s>"],)
+    '''
+    with track_gen("LLM_CHAT"):
+        result = llm(
+        prompt,
+        max_tokens=max_tokens,
+        temperature=temperature,
+        top_p=0.9,
+        top_k=40,
+        repeat_penalty=1.1,
+        # Stop the model as soon as it tries to start a new turn or switch speaker
+        stop=["[PLAYER", "[ASSISTANT", "[SYSTEM", "[ITEM", "</s>"],)
+
+    metrics.increment("llm_calls",1)
 
     choices = result.get("choices", [])
     if not choices:
@@ -100,7 +111,7 @@ def reset_model():
     get_llm.cache_clear()
 
 
-def _trim_messages(messages: List[Message], max_chars: int) -> List[Message]:
+def _trim_messages(messages: List[Message], max_chars: int):
     #keep most recent+more inputs
     
     if len(messages) <= 1:

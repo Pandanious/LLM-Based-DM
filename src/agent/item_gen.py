@@ -32,7 +32,7 @@ ITEM 2:
 ITEM_HEADER_RE = re.compile(r"^ITEM\s+(\d+):\s*$", re.MULTILINE)
 
 
-def _split_item_chunks(text: str) -> List[str]:
+def _split_item_chunks(text: str):
     matches = list(ITEM_HEADER_RE.finditer(text))
     if not matches:
         return []
@@ -47,12 +47,12 @@ def _split_item_chunks(text: str) -> List[str]:
     return chunks
 
 
-def _parse_field(label: str, text: str) -> str:
+def _parse_field(label: str, text: str):
     m = re.search(rf"^{label}:\s*(.+)$", text, re.IGNORECASE | re.MULTILINE)
     return m.group(1).strip() if m else ""
 
 
-def _parse_properties(raw: str) -> List[str]:
+def _parse_properties(raw: str):
     if not raw:
         return []
     parts = []
@@ -63,21 +63,16 @@ def _parse_properties(raw: str) -> List[str]:
     return parts
 
 
-def generate_items_for_character(
-    world_summary: str,
-    archetype: str,
-    count: int = 4,
-) -> List[Item]:
-    """
-    Ask the LLM for a small set of starter items and parse them into Item objects.
-    """
+def generate_items_for_character(world_summary: str, archetype: str, count: int = 4):
+    
+    # Ask the LLM for a small set of starter items and parse them into Item objects.
+    
     llm = get_llm()
 
     prompt = ITEM_GEN_PROMPT_TEMPLATE.format(
         world_summary=world_summary or "No summary provided.",
         archetype=archetype or "unspecified",
-        count=count,
-    )
+        count=count)
 
     result = llm(
         prompt,
@@ -85,8 +80,7 @@ def generate_items_for_character(
         temperature=0.75,
         top_p=0.9,
         top_k=40,
-        repeat_penalty=1.1,
-    )
+        repeat_penalty=1.1)
 
     raw = result["choices"][0]["text"].strip()
     chunks = _split_item_chunks(raw)

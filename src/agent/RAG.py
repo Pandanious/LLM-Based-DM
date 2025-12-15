@@ -23,7 +23,7 @@ def _load_json_files(root: Path):
 
 
 def _flatten_snippets(doc: dict):
-    """Yield (id, text) snippets from a game bundle-like dict."""
+    # Yield (id, text) snippets from a game bundle-like dict.
     # World
     world = doc.get("world") or {}
     if world:
@@ -50,7 +50,7 @@ def _flatten_snippets(doc: dict):
 
 
 def build_corpus(root: Path = SAVES_DIR):
-    """Collect small text snippets from all save files."""
+    # Collect small text snippets from all save files
     snippets = []
     for doc in _load_json_files(root):
         for sid, text in _flatten_snippets(doc):
