@@ -3,7 +3,7 @@ from pathlib import Path
 
 from src.game.game_state import GameState
 from src.game.models import World_State, PlayerCharacter, NPC, Quest
-from src.game.save_load import save_world_bundle, load_world_bundle, save_world_seed_bundle
+from src.game.save_load import save_game, load_game
 
 
 def _sample_world():
@@ -60,7 +60,7 @@ def _sample_quest():
     )
 
 
-def test_save_and_load_bundle(tmp_path: Path):
+def test_save_and_load_split(tmp_path: Path):
     game = GameState(
         world=_sample_world(),
         player_characters={"pc1": _sample_pc()},
@@ -70,8 +70,9 @@ def test_save_and_load_bundle(tmp_path: Path):
         active_turn_index=0,
     )
 
-    bundle_path = save_world_bundle(game, dest_dir=tmp_path)
-    loaded = load_world_bundle(bundle_path)
+    save_dir = save_game(game, game_id="game-1", root=tmp_path)
+    assert (save_dir / "world.json").exists()
+    loaded = load_game("game-1", root=tmp_path)
 
     world, players, npcs, quests, initiative_order, active_turn_index = loaded
 
@@ -83,10 +84,3 @@ def test_save_and_load_bundle(tmp_path: Path):
     assert quests["q1"].title == "Find the Gem"
     assert initiative_order == ["pc1"]
     assert active_turn_index == 0
-
-
-def test_save_world_seed_bundle(tmp_path: Path):
-    game = GameState(world=_sample_world())
-    path = save_world_seed_bundle(game, dest_dir=tmp_path)
-    assert path.exists()
-    assert "Test_World" in path.name

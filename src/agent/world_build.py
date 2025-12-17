@@ -10,7 +10,8 @@ from src.game.models import World_State
 WORLD_GEN_PROMPT_TEMPLATE = dedent("""
 You are an expert tabletop RPG worldbuilder. Expand the user's idea into a fully-realized campaign world.
 
-Start with: TITLE: <a short 2-5 word campaign title, max 30 characters>. Then write your answer in plain text with the following sections, in this exact order. Do not add decorative separator lines (no ==== or ----).
+Start with: TITLE: <a short 2-5 word campaign title, max 30 characters>. 
+Then write your answer in plain text with the following sections, in this exact order. Use plain ASCII. Do not add decorative separator lines (no ==== or ----).
 
 WORLD SUMMARY:
 Write 3-8 sentences describing the core identity of the world.
@@ -35,17 +36,17 @@ Include:
 MAJOR LOCATIONS (1):
 List exactly ONE major exploration hubs.
 For each:
-- NAME (1-3 words)
-- 2-4 sentences describing purpose, atmosphere, and important features.
+- NAME: (1-3 words)
+- DESCRIPTION: 2-4 sentences describing purpose, atmosphere, and important features.
 
 Format example:
-1. NAME - description...
+1. NAME - DESCRIPTION...
 
 MINOR LOCATIONS (2):
 List exactly TWO smaller adventuring or quest-oriented locations.
 For each:
-- NAME
-- 1-3 sentences describing its danger, mystery, or purpose.
+- NAME:
+- DESCRIPTION:1-3 sentences describing its danger, mystery, or purpose.
 
 Use the same numbering format.
 
@@ -63,13 +64,14 @@ Start the player in one of the locations, based upon the character they create.
 {setting}
 
 Do NOT:
-- write code
-- use backticks
-- add extra sections
-- repeat these instructions
-- invent new headers not listed above
-- ask questions
-- add visual separator lines like "====" or "----"
+- Write code
+- Use backticks
+- Add extra sections
+- Repeat these instructions
+- Invent new headers not listed above
+- Ask questions
+- Do not use bullets or unusual characters in text.
+- Add visual separator lines like "====" or "----"
 
 Write all text in a consistent, friendly, descriptive TTRPG tone.
 """)

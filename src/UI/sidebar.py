@@ -44,7 +44,7 @@ def render_sidebar(
         startbutton = st.button("Reset Game (this ID)", type="primary")
 
         # Save / load / party-summary controls
-        render_save_controls(game)
+        render_save_controls(game,game_id)
 
         # LLM reset
         if st.button("Reset the LLM Model"):
