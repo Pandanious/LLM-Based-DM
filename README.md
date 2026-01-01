@@ -35,7 +35,7 @@ This is a table top role playing game dungeon master. It takes care of generatio
 ## Tech stack
 - Python, Streamlit, llama-cpp-python.
 - Data: JSON saves under `saves/` for worlds, PCs, NPCs, quests, bundles, turn logs.
-- Retrieval: keyword search over saved JSON to feed `[CONTEXT]` into DM prompt; history summarization trims chat length.
+- Retrieval: local dense RAG over per-game snippets using sentence-transformers embeddings (stored under `saves/games/<id>/index/` and scored with cosine/dot-product); legacy TF-IDF keyword search lives in `src/agent/RAG.py`.
 
 ## Configuration
 - Model path: `src/config.py::model_path` (defaults to `model/Meta-Llama-3.1-8B-Instruct-Q6_K_L.gguf` - swap in your own GGUF).
@@ -56,6 +56,13 @@ This is a table top role playing game dungeon master. It takes care of generatio
 - GPU layers: set `gpu_layers=0` to stay CPU-only if you hit GPU issues.
 - Port conflicts: change the Streamlit port via `streamlit run ... --server.port 8502`.
 - Slow responses: lower `default_max_tokens` or increase `cpu_threads` within your hardware limits.
+
+## RAG
+- Dense RAG is local-only and per-game: snippets are collected from `saves/games/<id>/` (world, PCs, NPCs, quests, turns).
+- Embeddings use sentence-transformers `all-MiniLM-L6-v2` (cached under `model/`); vectors and metadata are stored in `saves/games/<id>/index/` as `embeddings.npy` and `meta.jsonl`.
+- Index builds on demand in `src/agent/dm_dice.py` before a DM turn; use `refresh_corpus(game_id)` to force a rebuild after saves change.
+- Retrieval query is the latest user message; top hits are formatted into `[CONTEXT ...]` blocks and prefixed to the DM prompt.
+- If no hits are found, the system guardrail asks the DM to respond with "I do not know." rather than inventing facts.
 
 ## Tests
 - Run locally: `python -m pytest src/tests` (or `src/tests/run_test.bat` on Windows).
@@ -80,3 +87,4 @@ Es zeigt insbesondere:
 - Nutzung eines lokal laufenden GGUF-Modells (llama-cpp-python)
 - Deterministisches, nachvollziehbares Retrieval statt intransparenter Cloud-Aufrufe
 - Tests und GitHub Actions für reproduzierbare Änderungen
+
