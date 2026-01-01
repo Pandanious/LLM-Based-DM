@@ -145,5 +145,5 @@ def evaluate_check(
         # "Normal" difficulty
         dc = 13
 
-    outcome = "success" if total >= dc else "failure"
+    outcome = "success" if total >= dc else "fail"
     return dc, outcome
