@@ -1,5 +1,5 @@
 from pathlib import Path
-from src.agent.RAG import collect_snippets, LocalVectorStore, Embedder, build_index, search
+from src.agent.RAG_dense import collect_snippets, Embedder, build_idx, search
 
 def test_collect_snippets(tmp_path: Path):
     # create fake split saves
@@ -15,7 +15,7 @@ def test_index_search(tmp_path: Path):
     gdir = tmp_path / "games" / "demo"
     gdir.mkdir(parents=True)
     (gdir / "world.json").write_text('{"world_summary":"Sky docks"}', encoding="utf-8")
-    embedder = Embedder(model_name="all-MiniLM-L6-v2") 
-    store = build_index("demo", embedder, saves_root=tmp_path / "games")
+    embedder = Embedder(model_name="all-MiniLM-L6-v2")
+    build_idx("demo", embedder, saves_root=tmp_path / "games")
     hits = search("demo", "dock", embedder, top_k=3, saves_root=tmp_path / "games")
     assert hits
