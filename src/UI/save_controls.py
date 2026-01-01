@@ -41,7 +41,7 @@ def render_save_controls(game: GameState, game_id):
             game.initiative_order = init_order
             game.active_turn_index = active_idx
             if world:
-                game.turn_log = load_turn_log(world.world_id)
+                game.turn_log = load_turn_log(game_id)
 
                 players_str = ", ".join(world.players) if world.players else "Unnamed adventurers"
                 system_prompt = DM_SYSTEM_PROMPT_TEMPLATE.format(

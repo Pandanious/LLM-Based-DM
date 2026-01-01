@@ -108,7 +108,7 @@ if user_input and not world_exists:
 
 # Gameplay input
 if user_input and world_exists and pcs_exist:
-    handle_gameplay_input(user_input, game, speaker)
+    handle_gameplay_input(user_input, game, speaker, game_id)
 
 
 # ---------------------------------------
@@ -139,7 +139,7 @@ if world_exists and pcs_exist:
 # ---------------------------------------
 
 with initiative_sidebar:
-    render_initiative_controls(game)
+    render_initiative_controls(game, game_id)
 
 # ---------------------------------------
 # ENCOUNTER STATUS

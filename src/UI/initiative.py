@@ -9,7 +9,7 @@ from src.UI.mechanics_prompt import refresh_mechanics_prompt
 from src.agent.dm_dice import refresh_corpus
 
 
-def rebuild_initiative_order(game: GameState):
+def rebuild_initiative_order(game: GameState, game_id: str):
     pcs = game.player_characters or {}
     ordered = sorted(
         pcs.values(),
@@ -18,7 +18,7 @@ def rebuild_initiative_order(game: GameState):
     )
     game.initiative_order = [pc.pc_id for pc in ordered]
     game.active_turn_index = 0 if game.initiative_order else 0
-    refresh_corpus()
+    refresh_corpus(game_id)
 
 
 
@@ -42,7 +42,7 @@ def add_turn_system_message(game: GameState, pc):
     game.messages.append(Message(role="system", content=turn_line))
 
 
-def render_initiative_controls(game: GameState):
+def render_initiative_controls(game: GameState, game_id: str):
     
     #initiative controls.
     
@@ -50,13 +50,13 @@ def render_initiative_controls(game: GameState):
     pcs_exist = bool(game.player_characters)
 
     if st.button("Build Initiative Order", disabled=not pcs_exist):
-        rebuild_initiative_order(game)
+        rebuild_initiative_order(game, game_id)
         actor = current_actor(game)
         if actor:
             add_turn_system_message(game, actor)
             if game.world is not None:
                 if not hasattr(game, "turn_log"):
-                    game.turn_log = load_turn_log(game.world.world_id)
+                    game.turn_log = load_turn_log(game_id)
                 game.turn_log = begin_turn(game.turn_log, actor)
                 save_turn_log(game.turn_log)
             refresh_mechanics_prompt(game)
@@ -91,7 +91,7 @@ def render_initiative_controls(game: GameState):
                 add_turn_system_message(game, actor)
                 if game.world is not None:
                     if not hasattr(game, "turn_log"):
-                        game.turn_log = load_turn_log(game.world.world_id)
+                        game.turn_log = load_turn_log(game_id)
                     game.turn_log = begin_turn(game.turn_log, actor)
                     save_turn_log(game.turn_log)
                 refresh_mechanics_prompt(game)

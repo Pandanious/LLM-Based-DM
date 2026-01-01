@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import re
+from functools import lru_cache
 from typing import Dict, List, Optional
 
-from src.agent.RAG import build_corpus, search_snippets, format_context_blocks
+from src.agent.RAG_dense import build_idx, search, context_block_format, Embedder
 from src.agent.types import Message
 from src.game.dice import roll_dice
 from src.game.models import PlayerCharacter
@@ -50,14 +51,20 @@ CONTEXT_GUARD = (
 
 
 
-_CORPUS = None
+@lru_cache(maxsize=1)
+def _get_embedder():
+    return Embedder()
 
 
-def _get_corpus():
-    global _CORPUS
-    if _CORPUS is None:
-        _CORPUS = build_corpus()
-    return _CORPUS
+_INDEX_READY = set()
+
+
+def _ensure_index(game_id: str):
+    if game_id in _INDEX_READY:
+        return
+    embedder = _get_embedder()
+    build_idx(game_id, embedder)
+    _INDEX_READY.add(game_id)
 
 
 def _messages_to_transcript(messages: List[Message]):
@@ -106,18 +113,15 @@ def _maybe_summarize_history(messages: List[Message], limit: int = 60, keep_rece
     return anchors + [summary_msg] + recent_slice
 
 
-def _build_context_prefix(messages: List[Message], top_k: int = 5):
-    corpus = _get_corpus()
-    if not corpus:
-        return NO_CONTEXT_GUARD
-
+def _build_context_prefix(game_id: str, messages: List[Message], top_k: int = 5):
     last_user = next((m for m in reversed(messages) if m.role == "user"), None)
     query = last_user.content if last_user else ""
-    hits = search_snippets(query, corpus, top_k=top_k)
+    embedder = _get_embedder()
+    hits = search(game_id, query, embedder, top_k=top_k)
     if not hits:
         return NO_CONTEXT_GUARD
     
-    context_block = format_context_blocks(hits)
+    context_block = context_block_format(hits)
     
     return f"{context_block}\n{CONTEXT_GUARD}"
 
@@ -163,13 +167,14 @@ def _find_pc_for_speaker(speaker: Optional[str], player_characters: Dict[str, Pl
     return None
 
 
-def dm_turn_with_dice(messages: List[Message], player_characters: Dict[str, PlayerCharacter]):
+def dm_turn_with_dice(game_id: str, messages: List[Message], player_characters: Dict[str, PlayerCharacter]):
     
     # Collapse long histories to a summary to save context
     messages[:] = _maybe_summarize_history(messages)
 
     # Ask the DM to respond to the current messages with retrieved context
-    prefix = _build_context_prefix(messages)
+    _ensure_index(game_id)
+    prefix = _build_context_prefix(game_id, messages)
     dm_reply = chat_completion(messages, temperature=0.6, prefix=prefix)
     dm_message = Message(role="assistant", content=dm_reply, speaker="Dungeon Master")
     messages.append(dm_message)
@@ -254,7 +259,7 @@ def dm_turn_with_dice(messages: List[Message], player_characters: Dict[str, Play
 
     # Ask DM again to narrate the outcome based on the roll result
     
-    outcome_prefix = _build_context_prefix(messages)
+    outcome_prefix = _build_context_prefix(game_id, messages)
     outcome_text = chat_completion(messages, temperature=0.6, prefix=outcome_prefix)
     outcome_message = Message(
         role="assistant",
@@ -264,8 +269,7 @@ def dm_turn_with_dice(messages: List[Message], player_characters: Dict[str, Play
 
     return messages
 
-def refresh_corpus():
-    global _CORPUS
-    _CORPUS = build_corpus()
-
-
+def refresh_corpus(game_id: str):
+    if game_id in _INDEX_READY:
+        _INDEX_READY.remove(game_id)
+    _ensure_index(game_id)

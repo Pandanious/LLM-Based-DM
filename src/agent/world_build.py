@@ -57,6 +57,7 @@ No descriptions.
 
 THEMES & TONE:
 Write 3-6 bullet points about the overall mood, narrative direction, and recurring motifs.
+Themes only. Do not include instructions or player start here.
 
 PLAYER START :
 Start the player in one of the locations, based upon the character they create.                                   

@@ -106,19 +106,19 @@ def handle_world_creation(user_input: str, game_id: str, game: GameState):
             Message(role="assistant", content=intro, speaker="Dungeon Master")
         )
 
-        game.turn_log = load_turn_log(world.world_id)
+        game.turn_log = load_turn_log(game_id)
     finally:
         game.busy = False
         game.busy_by = None
         game.busy_task = None
 
 
-def handle_gameplay_input(user_input: str, game: GameState, speaker: str):
+def handle_gameplay_input(user_input: str, game: GameState, speaker: str, game_id: str):
     
     # Handle normal gameplay input when a world and PCs exist.
     
     if game.world is not None and not hasattr(game, "turn_log"):
-        game.turn_log = load_turn_log(game.world.world_id)
+        game.turn_log = load_turn_log(game_id)
 
     # 1) Intercept /quest commands
     if handle_quest_command(user_input, game):
@@ -188,7 +188,7 @@ def handle_gameplay_input(user_input: str, game: GameState, speaker: str):
                 add_turn_system_message(game, actor)
                 if game.world is not None:
                     if not hasattr(game, "turn_log"):
-                        game.turn_log = load_turn_log(game.world.world_id)
+                        game.turn_log = load_turn_log(game_id)
                     game.turn_log = begin_turn(game.turn_log, actor)
                     save_turn_log(game.turn_log)
 
@@ -236,6 +236,7 @@ def handle_gameplay_input(user_input: str, game: GameState, speaker: str):
     try:
         with st.spinner("The DM is thinking..."):
             game.messages = dm_turn_with_dice(
+            game_id,
             game.messages,
             game.player_characters,
         )

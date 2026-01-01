@@ -77,16 +77,20 @@ class TurnLog:
         )
 
 
-def _turns_path(world_id: str):
-    Path("saves").mkdir(exist_ok=True)
-    Path("saves/turns").mkdir(exist_ok=True)
-    return Path("saves/turns") / f"{world_id}_turns.json"
+def _slug(text: str):
+    return "".join(c if c.isalnum() or c in {"-", "_"} else "_" for c in (text or "")).strip("_") or "game"
 
 
-def load_turn_log(world_id: str):
-    path = _turns_path(world_id)
+def _turns_path(game_id: str):
+    base = Path("saves") / "games" / _slug(game_id)
+    base.mkdir(parents=True, exist_ok=True)
+    return base / "turns.json"
+
+
+def load_turn_log(game_id: str):
+    path = _turns_path(game_id)
     if not path.exists():
-        return TurnLog(world_id=world_id)
+        return TurnLog(world_id=game_id)
     data = json.loads(path.read_text(encoding="utf-8"))
     return TurnLog.from_dict(data)
 

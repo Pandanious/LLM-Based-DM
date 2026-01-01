@@ -58,9 +58,18 @@ This is a table top role playing game dungeon master. It takes care of generatio
 - Slow responses: lower `default_max_tokens` or increase `cpu_threads` within your hardware limits.
 
 ## Tests
-- Tests can be run locally with -m pytest src/test (or run src/tests/run_test.bat (windows))
-- Github Actions runs the tests on user initiated request through actions. (see badge above)
-- Optional Local test, test 'RUN_LLM_TESTS=1' and run 'python -m pytest .\src\tests\test_local_llm_model.py' to test with model. (Local Model needed)
+- Run locally: `python -m pytest src/tests` (or `src/tests/run_test.bat` on Windows).
+- The suite is mostly unit tests with mocks/fixtures; it covers:
+  - RAG corpus building, dense/keyword search, and `[CONTEXT]` block formatting.
+  - DM context guardrails when no corpus or no hits.
+  - Command parsing and action synonym handling.
+  - Dice rolling, roll-request parsing, and action-label enforcement.
+  - Action modifier calculation and check evaluation.
+  - Save/load round trips for world, PCs, NPCs, quests, and initiative.
+  - World generation parsing plus prompt formatting/history trimming and summarization behavior.
+- Optional local model smoke tests (requires a GGUF model and `RUN_LLM_TESTS=1`):
+  `python -m pytest src/tests/test_local_llm_model.py`
+- GitHub Actions runs the tests on demand (see badge above).
 
 
 ## For reviewers (In German)
